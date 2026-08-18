@@ -1,0 +1,80 @@
+# Stage 1: Builder
+FROM node:20-alpine AS builder
+
+ENV CI=true
+RUN corepack enable
+WORKDIR /app
+
+# Copy root package files
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+
+# Copy package.json files (only those needed for web build)
+COPY packages/api/package.json packages/api/
+COPY packages/db/package.json packages/db/
+COPY packages/shared/package.json packages/shared/
+COPY packages/a2a/package.json packages/a2a/
+COPY packages/mcp/package.json packages/mcp/
+COPY packages/mcp-admin/package.json packages/mcp-admin/
+COPY packages/web/package.json packages/web/
+
+# Copy patches directory
+COPY patches ./patches
+
+# Remove prepare script to prevent husky from running
+RUN npm pkg delete scripts.prepare
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile
+
+# Copy source code
+COPY packages/shared packages/shared
+COPY packages/api packages/api
+COPY packages/web packages/web
+COPY packages/db packages/db
+COPY packages/a2a packages/a2a
+COPY packages/mcp packages/mcp
+COPY packages/mcp-admin packages/mcp-admin
+
+# Generate prisma client for types
+WORKDIR /app/packages/db
+RUN pnpm prisma generate
+RUN pnpm build
+
+# Build shared first
+WORKDIR /app
+RUN pnpm --filter @sentinel/shared build
+
+# Build api dependencies (needed for types)
+RUN pnpm --filter @sentinel/a2a build
+RUN pnpm --filter @sentinel/mcp build
+RUN pnpm --filter @sentinel/mcp-admin build
+RUN pnpm --filter @sentinel/api build
+
+# Build web
+WORKDIR /app/packages/web
+# Set default API URL to relative path, can be overridden via --build-arg
+ARG VITE_API_URL=
+ENV VITE_API_URL=${VITE_API_URL}
+RUN pnpm build
+
+# Stage 2: Runtime (smaller nginx image)
+FROM nginx:alpine-slim
+
+# Remove default nginx static assets
+RUN rm -rf /usr/share/nginx/html/*
+
+# Install curl for healthcheck
+RUN apk add --no-cache curl
+
+# Copy built assets from builder
+COPY --from=builder /app/packages/web/dist /usr/share/nginx/html
+
+# Copy custom nginx config
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:80/ || exit 1
+
+CMD ["nginx", "-g", "daemon off;"]

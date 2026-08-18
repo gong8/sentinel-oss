@@ -1,0 +1,32 @@
+{
+  "name": "@sentinel/a2a",
+  "version": "0.1.0",
+  "license": "AGPL-3.0-only",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "a2a-proxy": "./dist/server.js"
+  },
+  "scripts": {
+    "dev": "dotenv -e ../../.env -- tsc-watch --onSuccess \"node dist/server.js\"",
+    "build": "tsc",
+    "start": "dotenv -e ../../.env -- node dist/server.js",
+    "lint": "eslint src --ext .ts --max-warnings=0",
+    "typecheck": "tsc --noEmit",
+    "test": "dotenv -e ../../.env -- vitest"
+  },
+  "dependencies": {
+    "@sentinel/shared": "workspace:*",
+    "zod": "^4.3.5"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.3",
+    "dotenv-cli": "^8.0.0",
+    "tsc-watch": "^7.2.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.16"
+  }
+}

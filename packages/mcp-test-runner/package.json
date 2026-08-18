@@ -1,0 +1,25 @@
+{
+  "name": "@sentinel/mcp-test-runner",
+  "version": "0.1.0",
+  "license": "AGPL-3.0-only",
+  "description": "MCP server for running tests with filtered output",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "mcp-test-runner": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "zod": "^3.25.51"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  }
+}

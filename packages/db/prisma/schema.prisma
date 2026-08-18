@@ -1,0 +1,2578 @@
+// SENTINEL Database Schema
+// This schema defines the data models for the SENTINEL control plane
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================================
+// CORE ENTITIES
+// ============================================================================
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Admin MCP Configuration
+  adminMcpEnabled         Boolean  @default(true)
+  adminMcpEnabledScopes   String[] @default([]) // ["POLICIES", "USERS", etc.]
+  adminMcpAllowedAdmins   String[] @default([]) // User IDs (empty = all admins)
+  adminMcpRateLimitPerMin Int      @default(30)
+  adminMcpConfirmationTtl Int      @default(300) // seconds, default 5 min
+
+  // Relations
+  users                    User[]
+  mcpServers               McpServer[]
+  policies                 Policy[]
+  policyTests              PolicyTest[]
+  policyAssertions         PolicyAssertion[]
+  auditLogEntries          AuditLogEntry[]
+  agents                   Agent[]
+  roles                    Role[]
+  adminActionLogs          AdminActionLog[]
+  oauthClientRegistrations OAuthClientRegistration[]
+  oauthStates              OAuthState[]
+  orgMcpOAuthTokens        OrgMcpOAuthToken[]
+
+  // Sensitive flags and webhooks
+  sensitiveToolFlags        SensitiveToolFlag[]
+  sensitiveApprovalRequests SensitiveFlagApprovalRequest[]
+  sensitiveRateLimitUsage   SensitiveFlagRateLimitUsage[]
+  webhookEndpoints          WebhookEndpoint[]
+
+  // Publisher registry (Agent Identity Attestation)
+  publisherRegistries PublisherRegistry[]
+
+  // A2A credentials
+  a2aCredentials A2ACredential[]
+
+  // Agent assistant conversations
+  agentConversations AgentConversation[]
+  agentConfirmations AgentConfirmation[]
+
+  // Session context for policy evaluation
+  sessions Session[]
+
+  // Policy conditions (deterministic evaluation)
+  toolParamValues ToolParamValue[]
+  settings        OrganizationSettings?
+
+  // LLM usage tracking
+  llmUsageLogs LlmUsageLog[]
+
+  // Agent memory and planning
+  agentMemories       AgentMemory[]
+  agentToolUsages     AgentToolUsage[]
+  toolEmbeddingCaches ToolEmbeddingCache[]
+  agentPlans          AgentPlan[]
+
+  // Admin MCP confirmations
+  adminMcpConfirmations AdminMcpConfirmation[]
+
+  // Global variables for policy conditions
+  globalVariableNamespaces GlobalVariableNamespace[]
+
+  // Enterprise workspaces
+  workspaces              Workspace[]
+  orgOwners               OrgOwner[]
+  ownershipTransfers      OwnershipTransfer[]
+  policyProposals         OrgWidePolicyProposal[]
+  ownerRecoveryRequests   OwnerRecoveryRequest[]
+  policyExceptionRequests PolicyExceptionRequest[]
+
+  // Feature discovery & notifications
+  featureTipOrgOverrides           FeatureTipOrgOverride[]
+  featureTipDismissals             FeatureTipDismissal[]
+  emailDigestPreferences           EmailDigestPreference[]
+  emailDigestLogs                  EmailDigestLog[]
+  milestoneAchievements            MilestoneAchievement[]
+  milestoneNotificationPreferences MilestoneNotificationPreference[]
+
+  // Policy tags
+  policyTags PolicyTag[]
+
+  @@index([createdAt])
+}
+
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  accessToken    String   @unique @default(cuid())
+  organizationId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Activity tracking
+  lastActivityAt DateTime? // Last API/MCP request timestamp
+
+  // Soft delete fields
+  deletedAt DateTime? // NULL = active, non-NULL = soft deleted
+  deletedBy String? // Admin user ID who deleted this user
+
+  // Relations
+  organization              Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userRoles                 UserRole[]
+  mcpConfigs                UserMcpConfig[]
+  auditLogEntries           AuditLogEntry[]
+  permissionRequests        PermissionRequest[]
+  adminActions              AdminActionLog[] // Actions performed by this admin
+  orgOAuthConnections       OrgMcpOAuthToken[]       @relation("OrgOAuthConnector")
+  workspaceOAuthConnections WorkspaceMcpOAuthToken[] @relation("WorkspaceOAuthConnector")
+
+  // Sensitive flags
+  createdSensitiveFlags SensitiveToolFlag[]            @relation("SensitiveFlagCreator")
+  approvalRequestsMade  SensitiveFlagApprovalRequest[] @relation("ApprovalRequestor")
+  approvalsGiven        SensitiveFlagApprovalRequest[] @relation("ApprovalApprover")
+
+  // Agent assistant conversations
+  agentConversations AgentConversation[]
+
+  // Admin MCP confirmations
+  adminMcpRequestedConfirmations AdminMcpConfirmation[] @relation("AdminMcpRequestedBy")
+  adminMcpConfirmedConfirmations AdminMcpConfirmation[] @relation("AdminMcpConfirmedBy")
+  adminMcpRejectedConfirmations  AdminMcpConfirmation[] @relation("AdminMcpRejectedBy")
+
+  // Enterprise workspaces
+  orgRole                   OrgRole                  @default(MEMBER)
+  workspaceMemberships      WorkspaceMember[]
+  orgOwnership              OrgOwner[]               @relation("OrgOwnership")
+  orgOwnersAdded            OrgOwner[]               @relation("OrgOwnerAddedBy")
+  ownershipTransfersFrom    OwnershipTransfer[]      @relation("OwnershipTransferFrom")
+  ownershipTransfersTo      OwnershipTransfer[]      @relation("OwnershipTransferTo")
+  proposedPolicies          OrgWidePolicyProposal[]  @relation("PolicyProposalProposedBy")
+  reviewedPolicyProposals   OrgWidePolicyProposal[]  @relation("PolicyProposalReviewedBy")
+  policyExceptionsRequested PolicyExceptionRequest[] @relation("PolicyExceptionRequestedBy")
+  policyExceptionsReviewed  PolicyExceptionRequest[] @relation("PolicyExceptionReviewedBy")
+
+  // Workspace chat relations
+  llmConfigs                 UserLLMConfig[]
+  workspaceChatConversations WorkspaceChatConversation[]
+  workspaceChatUsage         WorkspaceChatUsage[]
+
+  // Agent memory and planning
+  agentMemories   AgentMemory[]
+  agentToolUsages AgentToolUsage[]
+  agentPlans      AgentPlan[]
+
+  // Onboarding state
+  onboarding UserOnboarding?
+
+  // Feature discovery & notifications
+  userFeatureTipsSettings          UserFeatureTipsSettings[]
+  featureTipDismissals             FeatureTipDismissal[]
+  emailDigestPreferences           EmailDigestPreference[]
+  milestoneNotificationPreferences MilestoneNotificationPreference[]
+
+  @@index([organizationId])
+  @@index([email])
+  @@index([accessToken])
+  @@index([organizationId, deletedAt])
+}
+
+model Role {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  isAdmin        Boolean  @default(false) // Special flag - admin roles bypass normal checks
+  description    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Soft delete fields
+  deletedAt DateTime? // NULL = active, non-NULL = soft deleted
+  deletedBy String? // Admin user ID who deleted this role
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userRoles    UserRole[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@index([isAdmin])
+  @@index([organizationId, deletedAt])
+}
+
+model UserRole {
+  id        String   @id @default(cuid())
+  userId    String
+  roleId    String
+  createdAt DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@index([userId])
+  @@index([roleId])
+}
+
+// ============================================================================
+// PROTOCOL ENUMS (shared MCP/A2A)
+// ============================================================================
+
+enum ProtocolType {
+  MCP
+  A2A
+}
+
+enum AgentCardSource {
+  URL // Card auto-fetched from agentCardUrl
+  MANUAL // Card uploaded directly by admin
+}
+
+enum AuthType {
+  NONE
+  API_KEY
+  OAUTH
+  OIDC // OpenID Connect (for A2A)
+}
+
+enum TransportType {
+  HTTP
+  STDIO
+  SSE
+  WEBSOCKET
+}
+
+model Agent {
+  id             String   @id @default(cuid())
+  name           String
+  organizationId String
+  createdAt      DateTime @default(now())
+
+  // Soft delete fields
+  deletedAt DateTime? // NULL = active, non-NULL = soft deleted
+  deletedBy String? // Admin user ID who deleted this agent
+
+  // Protocol type (MCP or A2A)
+  protocolType ProtocolType @default(MCP)
+
+  // Identity attestation fields (Phase 2a)
+  signatureVerified   Boolean   @default(false)
+  signatureVerifiedAt DateTime?
+  publicKeyUrl        String? // JWKS endpoint URL
+  publicKeyCache      Json? // Cached JWKS content
+  publicKeyCachedAt   DateTime?
+
+  // A2A-specific fields (Phase 2b)
+  cardSource         AgentCardSource @default(URL)
+  agentCardUrl       String? // For URL: required. For MANUAL: optional (explicit refresh)
+  endpointUrl        String? // Extracted from card.url for easy querying
+  agentCardCache     Json? // Full Agent Card JSON
+  agentCardFetchedAt DateTime? // When last fetched/uploaded
+  agentCardHash      String? // SHA-256 for change detection
+
+  // Workspace scoping (null = org-wide agent)
+  workspaceId String?
+
+  // Relations
+  organization    Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace       Workspace?      @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  auditLogEntries AuditLogEntry[]
+  a2aCredential   A2ACredential?
+
+  // Sensitive flags
+  sensitiveOverrides        SensitiveFlagAgentOverride[]
+  sensitiveApprovalRequests SensitiveFlagApprovalRequest[]
+
+  @@index([organizationId])
+  @@index([organizationId, deletedAt])
+  @@index([organizationId, protocolType])
+  @@index([workspaceId])
+}
+
+// ============================================================================
+// A2A CREDENTIALS (Agent-to-Agent Protocol)
+// ============================================================================
+
+model A2ACredential {
+  id             String   @id @default(cuid())
+  organizationId String
+  agentId        String   @unique
+  authType       AuthType
+  credentials    String // Encrypted JSON blob
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  agent        Agent        @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+// ============================================================================
+// PUBLISHER REGISTRY (Agent Identity Attestation)
+// ============================================================================
+
+model PublisherRegistry {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String // Publisher name (e.g., "Anthropic")
+  publicKey      String // PEM-encoded public key (encrypted)
+  keyAlgorithm   String // RS256, ES256, EdDSA, etc.
+  keyFingerprint String // SHA-256 fingerprint for quick lookup
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Soft delete fields
+  deletedAt DateTime?
+  deletedBy String?
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, keyFingerprint])
+  @@index([organizationId])
+  @@index([organizationId, deletedAt])
+}
+
+// ============================================================================
+// MCP SERVER ENTITIES
+// ============================================================================
+
+model McpServer {
+  id             String      @id @default(cuid())
+  organizationId String
+  name           String
+  url            String
+  authType       McpAuthType
+  apiKey         String? // Encrypted API key (org-level)
+  credentials    Json? // Encrypted JSON credentials (org-level)
+  authConfig     Json? // Template config for API_KEY auth: { headerTemplates: {...}, queryTemplates: {...} }
+
+  // Transport configuration
+  transportType TransportType @default(HTTP)
+
+  // STDIO transport config (for local subprocess MCP servers)
+  stdioCommand    String? // Command to execute (e.g., "python", "node")
+  stdioArgs       Json? // Command arguments as JSON array
+  stdioWorkingDir String? // Working directory for subprocess
+  stdioEnv        String? // Encrypted environment variables JSON
+
+  // WebSocket transport config
+  wsReconnectMs Int? @default(5000) // Reconnect interval
+  wsMaxRetries  Int? @default(3) // Max reconnection attempts
+  wsHeartbeatMs Int? @default(30000) // Heartbeat interval
+
+  trusted   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Soft delete fields
+  deletedAt DateTime? // NULL = active, non-NULL = soft deleted
+  deletedBy String? // Admin user ID who deleted this server
+
+  // Workspace scoping (null = org-wide server)
+  workspaceId String?
+
+  // Tool classification status
+  classificationStatus    ClassificationStatus @default(NOT_STARTED)
+  classificationStartedAt DateTime?
+  classificationError     String?
+
+  // Relations
+  organization            Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace               Workspace?               @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  tools                   McpTool[]
+  userConfigs             UserMcpConfig[]
+  workspaceConfigs        WorkspaceMcpConfig[]
+  oauthClientRegistration OAuthClientRegistration?
+  orgOAuthToken           OrgMcpOAuthToken?
+  workspaceOAuthTokens    WorkspaceMcpOAuthToken[]
+  toolParamValues         ToolParamValue[]
+
+  @@index([organizationId])
+  @@index([trusted])
+  @@index([organizationId, deletedAt])
+  @@index([workspaceId])
+}
+
+enum McpAuthType {
+  NONE
+  OAUTH
+  API_KEY
+}
+
+enum ClassificationStatus {
+  NOT_STARTED // No classification attempted yet
+  IN_PROGRESS // Currently classifying tools
+  COMPLETED // All tools classified successfully
+  FAILED // Classification failed
+}
+
+model McpTool {
+  id           String   @id @default(cuid())
+  mcpServerId  String
+  name         String
+  description  String?
+  inputSchema  Json? // JSON Schema from MCP tool definition (for condition building)
+  discoveredAt DateTime @default(now())
+
+  // Relations
+  mcpServer      McpServer              @relation(fields: [mcpServerId], references: [id], onDelete: Cascade)
+  classification McpToolClassification?
+
+  @@unique([mcpServerId, name])
+  @@index([mcpServerId])
+}
+
+// ============================================================================
+// TOOL CLASSIFICATION (LLM-based risk assessment)
+// ============================================================================
+
+enum ToolRiskLevel {
+  LOW // Read-only, no sensitive data
+  MEDIUM // May access sensitive data
+  HIGH // Modifies important data
+  CRITICAL // Deletes data, executes code, accesses secrets
+}
+
+enum ToolAccessType {
+  READ
+  WRITE
+  READ_WRITE
+}
+
+enum ClassificationSource {
+  LLM_AUTO // Classified automatically by LLM
+  USER_MANUAL // Overridden manually by user
+}
+
+model McpToolClassification {
+  id        String @id @default(cuid())
+  mcpToolId String @unique
+
+  riskLevel  ToolRiskLevel?
+  accessType ToolAccessType?
+  useCases   String?
+
+  source         ClassificationSource @default(LLM_AUTO)
+  llmConfidence  Float?
+  llmRawResponse Json?
+
+  // Override tracking
+  overriddenAt       DateTime?
+  overriddenBy       String?
+  originalRiskLevel  ToolRiskLevel?
+  originalAccessType ToolAccessType?
+  originalUseCases   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  mcpTool McpTool @relation(fields: [mcpToolId], references: [id], onDelete: Cascade)
+
+  @@index([mcpToolId])
+  @@index([riskLevel])
+  @@index([accessType])
+}
+
+// OAuth client registration per organization per MCP server
+// Stores DCR results or manually configured OAuth credentials
+model OAuthClientRegistration {
+  id             String @id @default(cuid())
+  organizationId String
+  mcpServerId    String @unique
+
+  // Client credentials (encrypted with AES-256-GCM)
+  clientId     String
+  clientSecret String // Encrypted
+
+  // Redirect URI used during registration (must match for token exchange)
+  redirectUri String? // Stored to ensure consistency across environments
+
+  // OAuth endpoints (discovered or manually configured)
+  authorizationEndpoint String
+  tokenEndpoint         String
+  registrationEndpoint  String? // DCR endpoint (if available)
+  revocationEndpoint    String? // Token revocation endpoint (if available)
+
+  // Authorization server metadata
+  scopesSupported     String[]
+  grantTypesSupported String[]
+
+  discoveredAt DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  mcpServer    McpServer    @relation(fields: [mcpServerId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+// Temporary OAuth state for PKCE + CSRF protection
+// Created when user initiates OAuth, consumed on callback
+model OAuthState {
+  id             String   @id @default(cuid())
+  organizationId String
+  state          String   @unique // CSRF token (cryptographically random)
+  userId         String
+  mcpServerId    String
+  codeVerifier   String // PKCE code_verifier (64 random bytes base64url)
+  resource       String // RFC 8707 resource URL (the MCP server URL)
+  returnUrl      String? // URL to redirect to after OAuth completes (e.g., /admin/credentials)
+  isOrgLevel     Boolean  @default(false) // True if connecting for org, false for personal
+  workspaceId    String? // If set, tokens are stored at workspace level
+  expiresAt      DateTime // 10 minute expiry
+  createdAt      DateTime @default(now())
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([state])
+  @@index([organizationId])
+  @@index([expiresAt]) // For cleanup of expired states
+}
+
+model UserMcpConfig {
+  id          String  @id @default(cuid())
+  userId      String
+  mcpServerId String
+  apiKey      String? // Encrypted API key (user-level)
+  credentials Json // Encrypted: legacy API keys / custom credentials
+
+  // OAuth 2.1 token storage (all encrypted)
+  accessToken     String? // Encrypted access token
+  refreshToken    String? // Encrypted refresh token
+  tokenType       String? // Usually "Bearer"
+  tokenExpiresAt  DateTime? // When the access token expires
+  tokenScope      String? // Granted OAuth scopes (space-separated)
+  lastRefreshedAt DateTime? // When tokens were last refreshed
+
+  authenticatedAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mcpServer McpServer @relation(fields: [mcpServerId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, mcpServerId])
+  @@index([userId])
+  @@index([mcpServerId])
+}
+
+// Organization-level OAuth token storage
+// When admin connects OAuth for the org, tokens are stored here
+// Users inherit this connection unless they have personal tokens
+model OrgMcpOAuthToken {
+  id             String @id @default(cuid())
+  organizationId String
+  mcpServerId    String @unique // One org token per server
+
+  // OAuth 2.1 token storage (all encrypted)
+  accessToken     String // Encrypted access token
+  refreshToken    String? // Encrypted refresh token
+  tokenType       String    @default("Bearer")
+  tokenExpiresAt  DateTime? // When the access token expires
+  tokenScope      String? // Granted OAuth scopes
+  lastRefreshedAt DateTime? // When tokens were last refreshed
+
+  // Audit info
+  connectedBy     String? // User ID of admin who connected (nullable for SetNull on user deletion)
+  authenticatedAt DateTime
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  mcpServer       McpServer    @relation(fields: [mcpServerId], references: [id], onDelete: Cascade)
+  connectedByUser User?        @relation("OrgOAuthConnector", fields: [connectedBy], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+}
+
+// Workspace-level credential storage for MCP servers
+// Workspace admins can set credentials that apply to all users in the workspace
+// Priority: Personal > Workspace > Organization
+model WorkspaceMcpConfig {
+  id          String  @id @default(cuid())
+  workspaceId String
+  mcpServerId String
+  apiKey      String? // Encrypted API key (workspace-level)
+  credentials Json? // Encrypted: custom credentials JSON
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  mcpServer McpServer @relation(fields: [mcpServerId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, mcpServerId])
+  @@index([workspaceId])
+  @@index([mcpServerId])
+}
+
+// Workspace-level OAuth token storage
+// Workspace admins can connect OAuth for their workspace
+// Priority: Personal > Workspace > Organization
+model WorkspaceMcpOAuthToken {
+  id          String @id @default(cuid())
+  workspaceId String
+  mcpServerId String
+
+  // OAuth 2.1 token storage (all encrypted)
+  accessToken     String // Encrypted access token
+  refreshToken    String? // Encrypted refresh token
+  tokenType       String    @default("Bearer")
+  tokenExpiresAt  DateTime? // When the access token expires
+  tokenScope      String? // Granted OAuth scopes
+  lastRefreshedAt DateTime? // When tokens were last refreshed
+
+  // Audit info
+  connectedBy     String? // User ID of admin who connected
+  authenticatedAt DateTime
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  mcpServer       McpServer @relation(fields: [mcpServerId], references: [id], onDelete: Cascade)
+  connectedByUser User?     @relation("WorkspaceOAuthConnector", fields: [connectedBy], references: [id], onDelete: SetNull)
+
+  @@unique([workspaceId, mcpServerId])
+  @@index([workspaceId])
+  @@index([mcpServerId])
+}
+
+// ============================================================================
+// POLICY ENTITIES
+// ============================================================================
+
+model Policy {
+  id             String       @id @default(cuid())
+  organizationId String
+  slug           String
+  matchers       String[] // e.g., ["role:admin", "user:alice@example.com"]
+  toolPatterns   String[] // e.g., ["notion.com::createPage", "github.com::*"]
+  effect         PolicyEffect
+  description    String
+  enabled        Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  // Deterministic conditions (Phase 1: Policy Architecture)
+  conditions Json? // PolicyCondition[] for simple mode (flat array with AND logic)
+
+  // Tree-based conditions with AND/OR nesting (Phase 3: Chip Builder)
+  conditionsTree Json? // ConditionGroupNode - full tree structure with AND/OR logic
+
+  // Advanced conditions (Phase 2: SQL-like expression language)
+  conditionMode       ConditionMode @default(SIMPLE)
+  conditionExpression Json? // { expression: string, ast: object, version: number }
+
+  // Soft delete fields
+  deletedAt DateTime? // NULL = active, non-NULL = soft deleted
+  deletedBy String? // Admin user ID who deleted this policy
+
+  // Workspace scoping (null = org-wide policy)
+  workspaceId String?
+
+  // Relations
+  organization            Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace               Workspace?               @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  linkedRequests          PermissionRequest[] // Requests that were resolved by this policy
+  createdFromProposals    OrgWidePolicyProposal[]  @relation("PolicyProposalCreatedPolicy")
+  exceptionRequestsTarget PolicyExceptionRequest[] @relation("PolicyExceptionTarget")
+  exceptionRequestsResult PolicyExceptionRequest[] @relation("PolicyExceptionResult")
+  tags                    PolicyTagAssignment[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+  @@index([enabled])
+  @@index([organizationId, deletedAt])
+  @@index([workspaceId])
+}
+
+enum ConditionMode {
+  SIMPLE // Visual condition builder with flat array
+  ADVANCED // SQL-like expression language
+}
+
+enum PolicyEffect {
+  ALLOW
+  DENY
+}
+
+// ============================================================================
+// POLICY TAGS
+// ============================================================================
+
+model PolicyTag {
+  id             String    @id @default(cuid())
+  organizationId String
+  workspaceId    String? // null = global (org-wide), otherwise workspace-scoped
+  name           String
+  description    String?
+  color          String    @default("#6366f1") // Default indigo
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace    Workspace?            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  policies     PolicyTagAssignment[]
+
+  @@unique([organizationId, workspaceId, name]) // Unique name per workspace (or global)
+  @@index([organizationId])
+  @@index([workspaceId])
+}
+
+model PolicyTagAssignment {
+  id          String   @id @default(cuid())
+  policyId    String
+  policyTagId String
+  createdAt   DateTime @default(now())
+
+  policy    Policy    @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  policyTag PolicyTag @relation(fields: [policyTagId], references: [id], onDelete: Cascade)
+
+  @@unique([policyId, policyTagId])
+  @@index([policyId])
+  @@index([policyTagId])
+}
+
+// ============================================================================
+// POLICY TEST ENTITIES
+// ============================================================================
+
+model PolicyTest {
+  id             String  @id @default(cuid())
+  organizationId String
+  createdById    String // Admin who created the test
+  toolName       String
+  userId         String? // User being tested
+  agentId        String? // Agent being tested
+
+  // Test result snapshot
+  decision      String // ALLOWED or DENIED
+  justification String?
+
+  // Policy snapshot at test time
+  matchedPolicyIds    String[] // Policies that matched
+  allEnabledPolicyIds String[] // All enabled policies at test time
+  policySnapshot      Json // Full snapshot of all policies
+
+  // Context snapshot
+  userEmail String?
+  userRoles String[]
+  agentName String?
+
+  // Tool invocation details (for condition testing)
+  toolParameters   Json? // The parameters used in the test
+  contextOverrides Json? // { hourOfDay?, dayOfWeek?, sourceIp?, timestamp? }
+  extractedContext Json? // { sql?, github?, file? }
+  extractedMode    String? // 'auto' | 'manual'
+
+  createdAt DateTime @default(now())
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([createdById])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// POLICY ASSERTION ENTITIES
+// ============================================================================
+
+enum AssertionSource {
+  MANUAL
+  PLAYGROUND
+  AUDIT_LOG
+}
+
+enum AssertionContextType {
+  USER
+  AGENT
+  ROLE
+  WILDCARD
+}
+
+model PolicyAssertion {
+  id             String @id @default(cuid())
+  organizationId String
+  createdById    String // Admin who created
+
+  // Identification
+  name        String // Human-readable name
+  description String? // Optional longer description
+
+  // Test definition
+  toolPattern String // e.g., "github.com::createPR" or "github.com::*"
+  contextType AssertionContextType // What context to test against
+  userId      String? // For USER context
+  agentId     String? // For AGENT context
+  roleName    String? // For ROLE context (test all users with this role)
+
+  // Expected outcome
+  expectedDecision String // "ALLOWED" or "DENIED"
+
+  // Tool invocation details (for condition testing)
+  toolParameters   Json? // Specific params to test with
+  contextOverrides Json? // Fixed context values for assertion
+  extractedContext Json? // Fixed extracted values
+  extractedMode    String? // 'auto' | 'manual'
+  parameterMode    String  @default("exact") // 'exact' | 'subset' | 'ignore'
+
+  // Source tracking
+  source   AssertionSource @default(MANUAL)
+  sourceId String? // PlaygroundTest ID or AuditLogEntry ID
+
+  // Last run status
+  lastRunAt            DateTime?
+  lastRunPassed        Boolean? // true = actual matched expected
+  lastRunDecision      String? // Actual decision from last run
+  lastRunJustification String?
+  lastRunPolicyIds     String[] // Policies that matched
+  lastRunSubResults    Json? // For ROLE/wildcard: array of sub-results
+
+  // Lifecycle
+  enabled      Boolean  @default(true)
+  failureCount Int      @default(0) // Historical failure count
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@index([enabled])
+  @@index([lastRunPassed])
+  @@index([source])
+}
+
+// ============================================================================
+// AUDIT ENTITIES
+// ============================================================================
+
+model AuditLogEntry {
+  id             String        @id @default(cuid())
+  organizationId String
+  userId         String?
+  agentId        String?
+  workspaceId    String? // Workspace context for filtering
+  toolName       String // Fully qualified: "notion.com::createPage"
+  parameters     Json
+  decision       AuditDecision
+  justification  String? // If denied, explains why
+  policyIds      String[] // Policies that contributed to decision
+  timestamp      DateTime      @default(now())
+
+  // Policy snapshot at evaluation time
+  matchedPolicyIds String[] // Policies that matched (subset of policyIds)
+  policySnapshot   Json? // Full snapshot of all enabled policies at evaluation time
+  userEmail        String? // User email at evaluation time (for historical accuracy)
+  userRoles        String[] // User roles at evaluation time (for historical accuracy)
+  agentName        String? // Agent name at evaluation time (for historical accuracy)
+
+  // MCP server context (for display after server deletion)
+  mcpServerName   String? // Friendly server name at evaluation time
+  toolNameDisplay String? // Display format "ServerName::toolName"
+
+  // Live approval tracking (for sensitive flags with REQUIRE_APPROVAL)
+  approvalRequired       Boolean   @default(false) // True if tool required live approval
+  approvalRequestId      String? // Link to SensitiveFlagApprovalRequest
+  approvalStatus         String? // APPROVED, DENIED, EXPIRED, CANCELLED
+  approvalDecidedBy      String? // User ID who decided
+  approvalDecidedByEmail String? // Email for display
+  approvalDecidedAt      DateTime? // When the decision was made
+
+  // Pipeline and Evaluation Tree (for audit visualization)
+  pipelineStage      String? // Final stage reached (REQUEST, SENTINEL_ENTRY, TRUST_CHECK, POLICY_CHECK, FLAG_CHECK, EXECUTE, SENTINEL_EXIT, LOG)
+  interruptedAt      String? // Stage where processing stopped
+  interruptionReason String? // Why it stopped
+
+  // Stage results
+  trustCheckPassed  Boolean? // Whether server trust check passed
+  serverTrusted     Boolean? // Whether the MCP server was trusted
+  policyCheckPassed Boolean? // Whether policy check passed
+  flagCheckPassed   Boolean? // Whether flag check passed
+
+  // Flag details
+  matchedFlagIds String[] @default([]) // IDs of flags that matched
+  flagBehaviors  String[] @default([]) // Behaviors of matched flags
+  rateLimitHit   Boolean? // Whether a rate limit was hit
+
+  // Full evaluation tree (PolicyEvaluationTree structure)
+  evaluationTree Json? // Complete evaluation tree for visualization
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  agent        Agent?       @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  workspace    Workspace?   @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([agentId])
+  @@index([timestamp])
+  @@index([decision])
+  @@index([toolName])
+  @@index([userEmail]) // For filtering deleted users by email
+  @@index([agentName]) // For filtering deleted agents by name
+  @@index([workspaceId]) // For filtering by workspace
+}
+
+enum AuditDecision {
+  ALLOWED
+  DENIED
+}
+
+// ============================================================================
+// PERMISSION REQUEST ENTITIES
+// ============================================================================
+
+enum PermissionRequestType {
+  TOOL_ACCESS
+  MCP_SERVER
+  DENY_REMOVAL // Request removal of explicit DENY policy
+}
+
+model PermissionRequest {
+  id             String                  @id @default(cuid())
+  userId         String
+  type           PermissionRequestType   @default(TOOL_ACCESS)
+  status         PermissionRequestStatus @default(PENDING)
+  reason         String
+  toolNames      String[] // Tools being requested (for TOOL_ACCESS)
+  data           Json? // Additional data (e.g., MCP server config for MCP_SERVER)
+  reviewedBy     String? // Admin user ID who reviewed
+  reviewedAt     DateTime?
+  reviewNote     String?
+  linkedPolicyId String? // Policy that resolved this request (for MODIFIED status)
+  grantDiff      Json? // Diff between requested and granted (only for MODIFIED status)
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+
+  // Workspace scoping (null = org-wide request)
+  workspaceId String?
+
+  // Relations
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  linkedPolicy Policy?    @relation(fields: [linkedPolicyId], references: [id], onDelete: SetNull)
+  workspace    Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+
+  // Workspace chat messages that link to this permission request
+  chatMessages WorkspaceChatMessage[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([linkedPolicyId])
+  @@index([workspaceId])
+}
+
+enum PermissionRequestStatus {
+  PENDING
+  APPROVED
+  DENIED
+  WITHDRAWN
+  MODIFIED
+}
+
+// ============================================================================
+// ADMIN ACTION LOG ENTITIES
+// ============================================================================
+
+model AdminActionLog {
+  id             String            @id @default(cuid())
+  organizationId String
+  adminUserId    String? // Admin who performed the action (nullable for SetNull on user deletion)
+  actionType     AdminActionType
+  resourceType   AdminResourceType
+  resourceId     String? // ID of the affected resource (null for bulk actions)
+  resourceName   String? // Human-readable name of the resource (e.g., policy slug, user email)
+
+  // Detailed action data
+  actionDetails  Json // Flexible JSON for action-specific data
+  beforeSnapshot Json? // Snapshot of resource before action (for updates/deletes)
+  afterSnapshot  Json? // Snapshot of resource after action (for creates/updates)
+
+  // Context and metadata
+  ipAddress String? // IP address of admin (if available)
+  userAgent String? // User agent string (if available)
+  reason    String? // Optional reason/note for the action
+
+  // MCP Source Identification
+  source            AdminActionSource @default(UI)
+  mcpSessionId      String?
+  mcpToolName       String?
+  confirmationId    String?
+  confirmedByUserId String?
+  confirmedAt       DateTime?
+
+  // Workspace scoping (null = org-wide action)
+  workspaceId String?
+
+  // Request context
+  requestHeaders     Json? // Sanitized HTTP headers (auth tokens stripped)
+  referrer           String?
+  sessionFingerprint String? // Hash of user agent + IP for session tracking
+  requestPath        String? // API endpoint path
+
+  // Change diff (computed at write time)
+  changeDiff  Json? // { field: { before, after, changeType } }
+  diffSummary String? // Human-readable: "Changed effect from ALLOW to DENY"
+
+  // Related resources (with names preserved)
+  relatedResources Json? // [{ type, id, name }]
+
+  // Action flow tracking
+  actionStage   String? // "initiated" | "confirmed" | "executed" | "completed" | "failed"
+  correlationId String? // Group related actions (e.g., MCP confirmation flow)
+
+  timestamp DateTime @default(now())
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  adminUser    User?        @relation(fields: [adminUserId], references: [id], onDelete: SetNull)
+  workspace    Workspace?   @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([adminUserId])
+  @@index([actionType])
+  @@index([resourceType])
+  @@index([resourceId])
+  @@index([timestamp])
+  @@index([source])
+  @@index([mcpSessionId])
+  @@index([organizationId, workspaceId])
+  @@index([correlationId])
+  @@index([organizationId, resourceType, resourceId, timestamp])
+}
+
+enum AdminActionType {
+  // User actions
+  USER_CREATE
+  USER_UPDATE
+  USER_DELETE
+  USER_RESTORE
+  USER_ROLES_UPDATE
+  USER_TOKEN_REFRESH
+  USER_TOKEN_REVOKE
+
+  // Role actions
+  ROLE_CREATE
+  ROLE_UPDATE
+  ROLE_DELETE
+  ROLE_RESTORE
+
+  // Policy actions
+  POLICY_CREATE
+  POLICY_UPDATE
+  POLICY_DELETE
+  POLICY_RESTORE
+  POLICY_ENABLE
+  POLICY_DISABLE
+  POLICY_CONFLICT_RESOLVE // Policy deleted to resolve conflict
+
+  // MCP Server actions
+  MCP_SERVER_CREATE
+  MCP_SERVER_UPDATE
+  MCP_SERVER_DELETE
+  MCP_SERVER_RESTORE
+  MCP_SERVER_DISCOVER_TOOLS
+  MCP_SERVER_ORG_API_KEY_ADD
+  MCP_SERVER_ORG_API_KEY_UPDATE
+  MCP_SERVER_ORG_API_KEY_REMOVE
+
+  // OAuth actions
+  OAUTH_DISCOVER
+  OAUTH_CLIENT_REGISTER
+  OAUTH_CLIENT_CONFIGURE
+  OAUTH_FLOW_INITIATE
+  OAUTH_FLOW_COMPLETE
+  OAUTH_TOKEN_REFRESH
+  OAUTH_TOKEN_REVOKE
+  OAUTH_DISCONNECT
+
+  // Agent actions
+  AGENT_CREATE
+  AGENT_DELETE
+  AGENT_RESTORE
+  AGENT_VERIFY
+  AGENT_REFRESH_VERIFICATION
+  AGENT_TERMINATE // Admin-initiated session termination
+
+  // Publisher actions
+  PUBLISHER_CREATE
+  PUBLISHER_DELETE
+
+  // A2A actions
+  A2A_AGENT_REGISTER
+  A2A_AGENT_UPDATE
+  A2A_AGENT_DELETE
+  A2A_CREDENTIAL_SET
+  A2A_CREDENTIAL_DELETE
+  A2A_CARD_REFRESH
+  A2A_CONNECTION_TEST
+
+  // Personal credentials actions (user-level MCP config)
+  PERSONAL_API_KEY_SET
+  PERSONAL_API_KEY_REMOVE
+  PERSONAL_CREDENTIALS_SET
+  PERSONAL_CREDENTIALS_REMOVE
+
+  // Workspace credentials actions (workspace-level MCP config)
+  WORKSPACE_API_KEY_SET
+  WORKSPACE_API_KEY_REMOVE
+  WORKSPACE_CREDENTIALS_SET
+  WORKSPACE_CREDENTIALS_REMOVE
+  WORKSPACE_OAUTH_CONNECT
+  WORKSPACE_OAUTH_DISCONNECT
+
+  // Permission Request actions
+  PERMISSION_REQUEST_APPROVE
+  PERMISSION_REQUEST_DENY
+  DENY_POLICY_REMOVAL_APPROVE
+  DENY_POLICY_REMOVAL_DENY
+
+  // Organization actions
+  ORGANIZATION_UPDATE
+
+  // Sensitive flag actions
+  SENSITIVE_FLAG_CREATE
+  SENSITIVE_FLAG_UPDATE
+  SENSITIVE_FLAG_DELETE
+  SENSITIVE_OVERRIDE_CREATE
+  SENSITIVE_OVERRIDE_UPDATE
+  SENSITIVE_OVERRIDE_DELETE
+  SENSITIVE_APPROVAL_GRANTED
+  SENSITIVE_APPROVAL_DENIED
+  SENSITIVE_APPROVAL_CANCELLED
+
+  // Webhook actions
+  WEBHOOK_ENDPOINT_CREATE
+  WEBHOOK_ENDPOINT_UPDATE
+  WEBHOOK_ENDPOINT_DELETE
+
+  // Integration actions
+  INTEGRATION_CREATE
+  INTEGRATION_UPDATE
+  INTEGRATION_DELETE
+  INTEGRATION_ENABLE
+  INTEGRATION_DISABLE
+  INTEGRATION_TEST
+
+  // Global variable actions
+  GLOBAL_VAR_NAMESPACE_CREATE
+  GLOBAL_VAR_NAMESPACE_UPDATE
+  GLOBAL_VAR_NAMESPACE_DELETE
+  GLOBAL_VAR_NAMESPACE_RESTORE
+  GLOBAL_VAR_FIELD_CREATE
+  GLOBAL_VAR_FIELD_UPDATE
+  GLOBAL_VAR_FIELD_DELETE
+
+  // Workspace actions
+  WORKSPACE_CREATE
+  WORKSPACE_UPDATE
+  WORKSPACE_DELETE
+  WORKSPACE_RESTORE
+  WORKSPACE_MEMBER_ADD
+  WORKSPACE_MEMBER_REMOVE
+  WORKSPACE_MEMBER_ROLE_UPDATE
+  WORKSPACE_CHAT_SETTINGS_CREATE
+  WORKSPACE_CHAT_SETTINGS_UPDATE
+
+  // Organization owner actions
+  ORG_OWNER_ADD
+  ORG_OWNER_REMOVE
+  OWNERSHIP_TRANSFER_INITIATE
+  OWNERSHIP_TRANSFER_ACCEPT
+  OWNERSHIP_TRANSFER_DECLINE
+  OWNERSHIP_TRANSFER_CANCEL
+
+  // Policy proposal actions
+  POLICY_PROPOSAL_CREATE
+  POLICY_PROPOSAL_APPROVE
+  POLICY_PROPOSAL_REJECT
+
+  // Policy exception actions
+  POLICY_EXCEPTION_CREATE
+  POLICY_EXCEPTION_APPROVE
+  POLICY_EXCEPTION_DENY
+  POLICY_EXCEPTION_WITHDRAW
+
+  // Owner recovery actions
+  OWNER_RECOVERY_CREATE
+  OWNER_RECOVERY_CANCEL
+  OWNER_RECOVERY_DENY
+
+  // MCP confirmation actions
+  MCP_CONFIRMATION_REJECT
+}
+
+enum AdminResourceType {
+  USER
+  ROLE
+  POLICY
+  MCP_SERVER
+  OAUTH_CLIENT
+  AGENT
+  PUBLISHER
+  USER_MCP_CONFIG
+  WORKSPACE_MCP_CONFIG
+  PERMISSION_REQUEST
+  ORGANIZATION
+  SENSITIVE_FLAG
+  SENSITIVE_OVERRIDE
+  SENSITIVE_APPROVAL
+  WEBHOOK_ENDPOINT
+  INTEGRATION
+  A2A_CREDENTIAL
+  GLOBAL_VAR_NAMESPACE
+  GLOBAL_VAR_FIELD
+  WORKSPACE
+  WORKSPACE_MEMBER
+  WORKSPACE_CHAT_SETTINGS
+  ORG_OWNER
+  OWNERSHIP_TRANSFER
+  POLICY_PROPOSAL
+  POLICY_EXCEPTION
+  OWNER_RECOVERY
+  MCP_CONFIRMATION
+}
+
+enum AdminActionSource {
+  UI
+  MCP_ADMIN
+  API
+  SYSTEM
+}
+
+// ============================================================================
+// SENSITIVE TOOL FLAGS
+// ============================================================================
+
+enum SensitiveFlagBehavior {
+  REQUIRE_APPROVAL // Block until approved by session owner or admin
+  RATE_LIMIT // Enforce per-session rate limits
+  ALERT // Send webhook notification
+  // Note: Enhanced audit is now always-on for all sensitive flags
+}
+
+model SensitiveToolFlag {
+  id             String                  @id @default(cuid())
+  organizationId String
+  toolPattern    String // e.g., "github.com::*", "localhost:3012::submit_backtest"
+  behaviors      SensitiveFlagBehavior[]
+
+  // Behavior configs (JSON)
+  rateLimitConfig Json? // { maxPerSession: 5, windowMinutes: 60 }
+  approvalConfig  Json? // { allowedApprovers: ["session_owner", "admin"], timeoutSeconds: 300 }
+  alertConfig     Json? // { webhookEndpointIds: ["abc"] }
+
+  description String?
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   String?
+
+  // Workspace scoping (null = org-wide flag)
+  workspaceId String?
+
+  // Relations
+  organization   Organization                 @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace      Workspace?                   @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  creator        User?                        @relation("SensitiveFlagCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  agentOverrides SensitiveFlagAgentOverride[]
+
+  @@unique([organizationId, workspaceId, toolPattern])
+  @@index([organizationId, enabled])
+  @@index([workspaceId])
+}
+
+model SensitiveFlagAgentOverride {
+  id                  String @id @default(cuid())
+  sensitiveToolFlagId String
+  agentId             String
+
+  behaviors       SensitiveFlagBehavior[] // Empty array = inherit from parent flag
+  rateLimitConfig Json?
+  approvalConfig  Json?
+  exempted        Boolean                 @default(false) // Skip flag entirely for this agent
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  sensitiveToolFlag SensitiveToolFlag @relation(fields: [sensitiveToolFlagId], references: [id], onDelete: Cascade)
+  agent             Agent             @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@unique([sensitiveToolFlagId, agentId])
+  @@index([agentId])
+}
+
+enum ApprovalRequestStatus {
+  PENDING
+  APPROVED
+  DENIED
+  EXPIRED
+  CANCELLED
+}
+
+enum ApprovalType {
+  SENSITIVE_FLAG
+}
+
+model SensitiveFlagApprovalRequest {
+  id             String  @id @default(cuid())
+  organizationId String
+  sessionId      String
+  userId         String
+  agentId        String?
+  toolName       String
+  parameters     Json // Sanitized (secrets redacted)
+
+  // Workspace scoping (null = org-wide request)
+  workspaceId String?
+
+  type   ApprovalType          @default(SENSITIVE_FLAG)
+  status ApprovalRequestStatus @default(PENDING)
+
+  // Resolution
+  approvedBy   String?
+  approvedAt   DateTime?
+  deniedReason String?
+  expiresAt    DateTime
+  createdAt    DateTime  @default(now())
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace    Workspace?   @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  user         User         @relation("ApprovalRequestor", fields: [userId], references: [id], onDelete: Cascade)
+  approver     User?        @relation("ApprovalApprover", fields: [approvedBy], references: [id], onDelete: SetNull)
+  agent        Agent?       @relation(fields: [agentId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, status])
+  @@index([organizationId, type, status])
+  @@index([sessionId])
+  @@index([userId, status])
+  @@index([expiresAt])
+}
+
+model SensitiveFlagRateLimitUsage {
+  id              String   @id @default(cuid())
+  organizationId  String
+  sessionId       String
+  toolPattern     String
+  windowStart     DateTime
+  windowEnd       DateTime
+  invocationCount Int      @default(0)
+  lastInvocation  DateTime
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, toolPattern, windowStart])
+  @@index([windowEnd])
+}
+
+// ============================================================================
+// WEBHOOK INFRASTRUCTURE
+// ============================================================================
+
+enum WebhookEvent {
+  // Tool invocation events
+  TOOL_INVOCATION_ALLOWED
+  TOOL_INVOCATION_DENIED
+
+  // Sensitive flag events
+  SENSITIVE_TOOL_INVOKED
+  SENSITIVE_APPROVAL_NEEDED
+  SENSITIVE_RATE_LIMITED
+
+  // Policy events
+  POLICY_CREATED
+  POLICY_UPDATED
+  POLICY_DELETED
+
+  // Agent events
+  AGENT_CREATED
+  AGENT_DELETED
+  SESSION_TERMINATED // Admin-initiated session termination
+}
+
+enum WebhookEndpointType {
+  CUSTOM // Raw JSON payload - user provides URL, we send JSON with HMAC signature
+  DISCORD // Discord webhook - formatted embeds
+  SLACK // Slack webhook - formatted blocks
+  EMAIL // Email notification - formatted HTML
+}
+
+model WebhookEndpoint {
+  id             String              @id @default(cuid())
+  organizationId String
+
+  // Workspace scoping (null = org-wide webhook)
+  workspaceId String?
+
+  name String
+  type           WebhookEndpointType @default(CUSTOM)
+  url            String? // CUSTOM/DISCORD/SLACK: webhook URL. EMAIL: not used
+  events         WebhookEvent[]
+  secret         String? // CUSTOM: HMAC secret. Others: empty/unused
+  enabled        Boolean             @default(true)
+  config         Json? // Type-specific config (email recipients, etc.)
+  verbose        Boolean             @default(false) // Include detailed context in webhook payloads
+
+  // Retry configuration
+  maxRetries   Int @default(3)
+  retryDelayMs Int @default(1000)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String?
+
+  // Relations
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace    Workspace?        @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  deliveries   WebhookDelivery[]
+
+  @@index([organizationId, enabled])
+  @@index([workspaceId])
+}
+
+model WebhookDelivery {
+  id         String       @id @default(cuid())
+  endpointId String
+  event      WebhookEvent
+  payload    Json
+
+  // Delivery status
+  responseStatus Int?
+  responseBody   String?
+  deliveredAt    DateTime?
+  failedAt       DateTime?
+  retryCount     Int       @default(0)
+  nextRetryAt    DateTime?
+
+  createdAt DateTime @default(now())
+
+  // Relations
+  endpoint WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  @@index([endpointId])
+  @@index([nextRetryAt])
+}
+
+// ============================================================================
+// AGENT ASSISTANT (AI-Powered Admin Chat)
+// ============================================================================
+
+model AgentConversation {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String? // Dashboard user (null for MCP agent)
+  mcpAgentId     String? // External MCP agent (null for dashboard user)
+  title          String? // Auto-generated or user-set
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  organization  Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user          User?               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages      AgentMessage[]
+  confirmations AgentConfirmation[]
+
+  @@index([organizationId, userId])
+  @@index([organizationId, mcpAgentId])
+  @@index([createdAt])
+}
+
+enum AgentMessageRole {
+  USER
+  ASSISTANT
+  TOOL_USE
+  TOOL_RESULT
+}
+
+model AgentMessage {
+  id             String           @id @default(cuid())
+  conversationId String
+  role           AgentMessageRole
+  content        String // Text content or tool call description
+  toolName       String? // Tool name if TOOL_USE or TOOL_RESULT
+  toolInput      Json? // Tool input parameters
+  toolResult     Json? // Tool result data
+  createdAt      DateTime         @default(now())
+
+  // Relations
+  conversation AgentConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@index([createdAt])
+}
+
+enum AgentConfirmationStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  EXPIRED
+}
+
+model AgentConfirmation {
+  id             String  @id @default(cuid())
+  organizationId String
+  conversationId String? // For dashboard chat
+  mcpSessionId   String? // For MCP access
+  workspaceId    String? // Workspace context for scoped operations
+
+  // The proposed action
+  toolName    String // Tool to execute (e.g., "create_policy")
+  toolInput   Json // Input parameters for the tool
+  description String // Human-readable description of the action
+
+  // Status tracking
+  status AgentConfirmationStatus @default(PENDING)
+
+  // Result (after confirmation)
+  confirmedAt DateTime?
+  confirmedBy String? // User ID who confirmed
+  executedAt  DateTime?
+  result      Json? // Result from tool execution
+  error       String? // Error message if execution failed
+
+  // Lifecycle
+  createdAt DateTime @default(now())
+  expiresAt DateTime // Auto-expire after TTL (e.g., 5 minutes)
+
+  // Relations
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  conversation AgentConversation? @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  workspace    Workspace?         @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, status])
+  @@index([conversationId])
+  @@index([expiresAt])
+  @@index([workspaceId])
+}
+
+// ============================================================================
+// AGENT MEMORY (Persistent context for AI agent)
+// ============================================================================
+
+enum AgentMemoryType {
+  CONVERSATION_SUMMARY // Summarized past conversations
+  USER_PREFERENCE // Preferred tools, patterns
+  ENTITY_REFERENCE // Policies, servers, users mentioned
+  TOOL_USAGE_PATTERN // Learned tool patterns
+  CORRECTION // User corrections to agent behavior
+}
+
+model AgentMemory {
+  id             String  @id @default(cuid())
+  organizationId String
+  userId         String? // null = org-wide memory
+
+  memoryType AgentMemoryType
+  category   String // e.g., "tool_preference", "entity:policy"
+  key        String // Unique within category (e.g., tool name, entity id)
+
+  content Json // Structured memory content
+  summary String? // Human-readable summary for quick retrieval
+
+  // Importance and access tracking for decay/pruning
+  importance     Float    @default(0.5) // 0.0 to 1.0, decays over time
+  accessCount    Int      @default(0)
+  lastAccessedAt DateTime @default(now())
+
+  // Lifecycle
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  expiresAt DateTime? // Optional expiration
+
+  // Source conversation (if applicable)
+  sourceConversationId String?
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId, category, key])
+  @@index([organizationId, memoryType])
+  @@index([organizationId, userId, category])
+  @@index([importance])
+  @@index([lastAccessedAt])
+}
+
+model AgentToolUsage {
+  id             String  @id @default(cuid())
+  organizationId String
+  userId         String? // null = org-wide pattern
+
+  toolName        String
+  contextKeywords String[] // Keywords that triggered this tool
+  success         Boolean // Whether the tool call was successful
+
+  createdAt DateTime @default(now())
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, toolName])
+  @@index([organizationId, userId, toolName])
+  @@index([createdAt])
+}
+
+// Tool embedding cache for semantic tool selection
+model ToolEmbeddingCache {
+  id             String  @id @default(cuid())
+  organizationId String? // null = admin/built-in tools
+
+  toolName       String
+  description    String  @db.Text // Tool description used for embedding
+  embedding      Float[] // Vector embedding (e.g., 1536 dimensions for OpenAI)
+  embeddingModel String // Model used to generate embedding (e.g., "text-embedding-3-small")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, toolName])
+  @@index([organizationId])
+}
+
+// ============================================================================
+// AGENT PLANNING (Multi-Step Operations)
+// ============================================================================
+
+enum AgentPlanStatus {
+  DRAFT // Plan generated, awaiting approval
+  PENDING // Approved, waiting to start
+  EXECUTING // Currently running
+  PAUSED // Paused mid-execution
+  COMPLETED // All steps finished successfully
+  FAILED // A step failed
+  ABORTED // User cancelled
+  ROLLED_BACK // Rolled back after failure
+}
+
+enum AgentPlanStepStatus {
+  PENDING // Not yet started
+  WAITING // Waiting for dependencies
+  CONFIRMING // Awaiting user confirmation (for write operations)
+  EXECUTING // Currently running
+  COMPLETED // Finished successfully
+  FAILED // Failed with error
+  SKIPPED // Skipped (e.g., due to condition)
+  ROLLED_BACK // Rolled back
+}
+
+model AgentPlan {
+  id             String  @id @default(cuid())
+  organizationId String
+  workspaceId    String? // Workspace scoping (null = org-wide plan)
+  conversationId String // Link to AgentConversation
+  userId         String
+
+  name        String // Short name for the plan
+  description String          @db.Text // Full description of what the plan does
+  status      AgentPlanStatus @default(DRAFT)
+
+  currentStep Int @default(0) // Current step index
+  totalSteps  Int // Total number of steps
+
+  result Json? // Final result data
+  error  String? // Error message if failed
+
+  // Timestamps
+  createdAt   DateTime  @default(now())
+  startedAt   DateTime? // When execution started
+  completedAt DateTime? // When execution finished
+
+  // Relations
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace    Workspace?      @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  steps        AgentPlanStep[]
+
+  @@index([organizationId, status])
+  @@index([conversationId])
+  @@index([userId])
+  @@index([workspaceId])
+}
+
+model AgentPlanStep {
+  id         String @id @default(cuid())
+  planId     String
+  stepNumber Int // 0-indexed step number
+
+  toolName    String // Name of the tool to execute
+  toolInput   Json // Tool input parameters
+  description String // Human-readable description of what this step does
+
+  dependsOn String[] // Step IDs this step depends on (must complete first)
+
+  status AgentPlanStepStatus @default(PENDING)
+  result Json? // Result data from tool execution
+  error  String? // Error message if failed
+
+  // Rollback support
+  canRollback       Boolean @default(false)
+  rollbackToolName  String? // Tool to call for rollback
+  rollbackToolInput Json? // Input for rollback tool
+  rolledBack        Boolean @default(false)
+
+  // Timestamps
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  // Relations
+  plan AgentPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, stepNumber])
+  @@index([planId])
+  @@index([status])
+}
+
+// ============================================================================
+// GLOBAL VARIABLES (Policy Condition Context)
+// ============================================================================
+
+enum GlobalVariableFieldType {
+  STRING
+  NUMBER
+  BOOLEAN
+  DATE
+  STRING_ARRAY
+  NUMBER_ARRAY
+}
+
+model GlobalVariableNamespace {
+  id             String    @id @default(cuid())
+  organizationId String
+  workspaceId    String? // null = global (org-wide), otherwise workspace-scoped
+  name           String // e.g., "COMPANY", "LIMITS"
+  description    String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  createdBy      String?
+  deletedAt      DateTime?
+  deletedBy      String?
+
+  organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace    Workspace?            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  fields       GlobalVariableField[]
+
+  // Namespace names must be unique within the same scope (global or workspace)
+  @@unique([organizationId, workspaceId, name])
+  @@index([organizationId])
+  @@index([organizationId, deletedAt])
+  @@index([workspaceId])
+}
+
+model GlobalVariableField {
+  id          String                  @id @default(cuid())
+  namespaceId String
+  name        String // e.g., "creationDate", "maxUsers"
+  description String?
+  fieldType   GlobalVariableFieldType
+  value       Json
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+
+  namespace GlobalVariableNamespace @relation(fields: [namespaceId], references: [id], onDelete: Cascade)
+
+  @@unique([namespaceId, name])
+  @@index([namespaceId])
+}
+
+// ============================================================================
+// SESSION CONTEXT
+// ============================================================================
+
+enum SessionStatus {
+  ACTIVE
+  EXPIRED
+  TERMINATED // Admin-initiated termination
+}
+
+enum SessionContextEntryType {
+  USER_INTENT
+  DATA_ACCESSED
+  RISK_SIGNAL
+  TOOL_OUTCOME
+  AGENT_OBSERVATION
+}
+
+model Session {
+  id                String  @id @default(cuid())
+  organizationId    String
+
+  // Workspace scoping (null = org-wide session)
+  workspaceId String?
+
+  externalSessionId String // Maps to existing sessionId string from MCP
+  userId            String?
+  agentId           String?
+
+  status         SessionStatus @default(ACTIVE)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  lastActivityAt DateTime      @default(now())
+  expiresAt      DateTime // 24 hours from creation by default
+
+  // Termination tracking
+  terminatedAt DateTime? // When the session was terminated
+  terminatedBy String? // Admin user ID who terminated
+
+  // Aggregated context
+  contextSummary String? // Rolling LLM-generated summary
+  toolCallCount  Int     @default(0)
+
+  // Relations
+  organization   Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace      Workspace?            @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  contextEntries SessionContextEntry[]
+
+  @@unique([organizationId, externalSessionId])
+  @@index([organizationId])
+  @@index([workspaceId])
+  @@index([expiresAt])
+  @@index([status])
+}
+
+model SessionContextEntry {
+  id        String                  @id @default(cuid())
+  sessionId String
+  entryType SessionContextEntryType
+  createdAt DateTime                @default(now())
+
+  key        String // e.g., "user_intent", "risk_signal", "data_sensitivity"
+  value      Json
+  summary    String? // LLM-generated summary
+  importance Float   @default(0.5) // 0.0-1.0 for pruning
+
+  sourceToolName String?
+  expiresAt      DateTime?
+
+  // Relations
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([sessionId, entryType])
+  @@index([importance])
+}
+
+// ============================================================================
+// POLICY CONDITIONS (Deterministic Evaluation)
+// ============================================================================
+
+// Tracks historical parameter values for condition builder suggestions
+// Values are shared across all tools from the same MCP server by parameter key
+model ToolParamValue {
+  id              String   @id @default(cuid())
+  organizationId  String
+  serverId        String // MCP server ID - values are shared across all tools on this server
+  toolName        String? // For reference/auditing only (not used in unique constraint)
+  parameterKey    String // e.g., "recipient", "query", "page_id"
+  parameterValue  String
+  displayLabel    String? // Human-readable label (e.g., "Q1 Planning" for page_abc123)
+  occurrenceCount Int      @default(1)
+  firstSeenAt     DateTime @default(now())
+  lastSeenAt      DateTime @default(now())
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  mcpServer    McpServer    @relation(fields: [serverId], references: [id], onDelete: Cascade)
+
+  // Unique per org+server+key+value - allows same key across servers
+  @@unique([organizationId, serverId, parameterKey, parameterValue])
+  @@index([organizationId, serverId])
+  @@index([organizationId, serverId, parameterKey])
+  @@index([lastSeenAt])
+}
+
+// Organization-level settings for policy features
+model OrganizationSettings {
+  id                        String        @id @default(cuid())
+  organizationId            String        @unique
+  defaultTimezone           String        @default("UTC")
+  paramHistoryRetentionDays Int           @default(90)
+  auditLogRetentionDays     Int           @default(90) // Days to retain audit logs (0 = indefinite)
+  defaultConditionMode      ConditionMode @default(SIMPLE) // Default mode when creating new policies
+  createdAt                 DateTime      @default(now())
+  updatedAt                 DateTime      @updatedAt
+
+  // LLM Provider Configuration (org-level fallback)
+  llmProvider    String  @default("auto") // auto|gemini|claude|openai|ollama|lmstudio|custom
+  llmModel       String? // Override default model
+  llmApiKey      String? // Encrypted API key (self-hosted mode)
+  llmBaseUrl     String? // Custom endpoint URL
+  llmMaxTokens   Int     @default(4096)
+  llmTemperature Float   @default(0.7)
+
+  // Feature discovery settings
+  featureTipsEnabled   Boolean @default(true)
+  monthlyDigestEnabled Boolean @default(true)
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+// ============================================================================
+// LLM USAGE TRACKING (Admin Agent)
+// ============================================================================
+
+model LlmUsageLog {
+  id             String  @id @default(cuid())
+  organizationId String
+  sessionId      String?
+
+  provider String // gemini|claude|openai|ollama|lmstudio|custom
+  model    String
+
+  inputTokens  Int
+  outputTokens Int
+  totalTokens  Int
+
+  estimatedCostCents Int? // null for local providers
+
+  requestType String? // agent|policy|chat|etc
+  createdAt   DateTime @default(now())
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, provider])
+}
+
+// ============================================================================
+// ADMIN MCP CONFIRMATION (Admin MCP Server)
+// ============================================================================
+
+enum AdminMcpConfirmationStatus {
+  PENDING
+  CONFIRMED
+  REJECTED
+  EXPIRED
+  EXECUTED
+  FAILED
+}
+
+model AdminMcpConfirmation {
+  id             String  @id @default(cuid())
+  organizationId String
+  workspaceId    String?
+
+  // Source identification
+  mcpSessionId String
+  adminUserId  String
+
+  // Tool details
+  toolName  String // e.g., "admin_create_policy"
+  toolInput Json // Full validated input
+  scope     String // AdminMcpScope enum value
+
+  // Human-readable
+  description String // "Create ALLOW policy for role:admin on github::*"
+  riskLevel   String // LOW, MEDIUM, HIGH
+
+  // Status
+  status    AdminMcpConfirmationStatus @default(PENDING)
+  expiresAt DateTime
+
+  // Resolution
+  confirmedAt     DateTime?
+  confirmedBy     String?
+  rejectedAt      DateTime?
+  rejectedBy      String?
+  rejectionReason String?
+
+  // Execution
+  executedAt DateTime?
+  result     Json?
+  error      String?
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace    Workspace?   @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  adminUser    User         @relation("AdminMcpRequestedBy", fields: [adminUserId], references: [id], onDelete: Cascade)
+  confirmer    User?        @relation("AdminMcpConfirmedBy", fields: [confirmedBy], references: [id], onDelete: SetNull)
+  rejecter     User?        @relation("AdminMcpRejectedBy", fields: [rejectedBy], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, status])
+  @@index([organizationId, workspaceId])
+  @@index([mcpSessionId])
+  @@index([adminUserId])
+  @@index([expiresAt])
+}
+
+// ============================================================================
+// ENTERPRISE WORKSPACES
+// ============================================================================
+
+enum OrgRole {
+  OWNER // Full org control, can manage other owners
+  MEMBER // Standard org member, access via workspaces
+}
+
+enum WorkspaceMemberRole {
+  MEMBER // Standard workspace member
+  ADMIN // Workspace admin, can manage workspace resources
+}
+
+enum OwnershipTransferStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+}
+
+enum PolicyProposalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum OwnerRecoveryStatus {
+  PENDING
+  APPROVED
+  DENIED
+  EXPIRED
+  CANCELLED
+}
+
+model Workspace {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  slug           String // URL-friendly identifier (lowercase, hyphenated)
+  description    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Soft delete fields
+  deletedAt DateTime?
+  deletedBy String?
+
+  // Relations
+  organization             Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  members                  WorkspaceMember[]
+  policies                 Policy[]
+  mcpServers               McpServer[]
+  agents                   Agent[]
+  globalVariableNamespaces GlobalVariableNamespace[]
+  adminActionLogs          AdminActionLog[]
+  policyExceptionRequests  PolicyExceptionRequest[]
+  permissionRequests       PermissionRequest[]
+  workspaceMcpConfigs      WorkspaceMcpConfig[]
+  workspaceMcpOAuthTokens  WorkspaceMcpOAuthToken[]
+
+  // Workspace chat relations
+  chatSettings      WorkspaceChatSettings?
+  chatConversations WorkspaceChatConversation[]
+  chatUsage         WorkspaceChatUsage[]
+  userLlmConfigs    UserLLMConfig[]
+
+  // Audit logs scoped to this workspace
+  auditLogs AuditLogEntry[]
+
+  // Sensitive tool flags scoped to this workspace
+  sensitiveToolFlags         SensitiveToolFlag[]
+  sensitiveApprovalRequests  SensitiveFlagApprovalRequest[]
+
+  // Admin MCP confirmations scoped to this workspace
+  adminMcpConfirmations AdminMcpConfirmation[]
+
+  // Agent plans scoped to this workspace
+  agentPlans AgentPlan[]
+
+  // Agent confirmations scoped to this workspace
+  agentConfirmations AgentConfirmation[]
+
+  // Feature discovery & notifications
+  workspaceFeatureTipsSettings WorkspaceFeatureTipsSettings?
+  userFeatureTipsSettings      UserFeatureTipsSettings[]
+
+  // Policy tags scoped to this workspace
+  policyTags PolicyTag[]
+
+  // Webhook endpoints scoped to this workspace
+  webhookEndpoints WebhookEndpoint[]
+
+  // Sessions scoped to this workspace
+  sessions Session[]
+
+  @@unique([organizationId, name])
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+  @@index([organizationId, deletedAt])
+}
+
+model WorkspaceMember {
+  id          String              @id @default(cuid())
+  workspaceId String
+  userId      String
+  role        WorkspaceMemberRole @default(MEMBER)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  // Relations
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([workspaceId])
+  @@index([userId])
+}
+
+model OrgOwner {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String
+  addedAt        DateTime @default(now())
+  addedBy        String? // User ID who added this owner (null for initial owner)
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation("OrgOwnership", fields: [userId], references: [id], onDelete: Cascade)
+  addedByUser  User?        @relation("OrgOwnerAddedBy", fields: [addedBy], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, userId])
+  @@index([organizationId])
+  @@index([userId])
+  @@index([addedBy])
+}
+
+model OwnershipTransfer {
+  id             String                  @id @default(cuid())
+  organizationId String
+  fromUserId     String // Current owner initiating transfer
+  toUserId       String // User receiving ownership
+  status         OwnershipTransferStatus @default(PENDING)
+  expiresAt      DateTime // Transfer expires if not accepted
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+
+  // Resolution
+  resolvedAt DateTime?
+  resolvedBy String? // User who resolved (accepted/declined)
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  fromUser     User         @relation("OwnershipTransferFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser       User         @relation("OwnershipTransferTo", fields: [toUserId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status])
+  @@index([toUserId, status])
+  @@index([expiresAt])
+}
+
+model OrgWidePolicyProposal {
+  id             String @id @default(cuid())
+  organizationId String
+  workspaceId    String // Workspace admin proposing the policy
+  proposedById   String // User who proposed
+
+  // Proposed policy data
+  matchers      String[]
+  toolPatterns  String[]
+  effect        PolicyEffect
+  description   String
+  conditions    Json?
+  justification String // Why this org-wide policy is needed
+
+  status    PolicyProposalStatus @default(PENDING)
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+
+  // Resolution
+  reviewedAt      DateTime?
+  reviewedBy      String? // Org owner who reviewed
+  reviewNote      String?
+  createdPolicyId String? // Policy ID if approved
+
+  // Relations
+  organization  Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  proposedBy    User         @relation("PolicyProposalProposedBy", fields: [proposedById], references: [id], onDelete: Cascade)
+  reviewer      User?        @relation("PolicyProposalReviewedBy", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  createdPolicy Policy?      @relation("PolicyProposalCreatedPolicy", fields: [createdPolicyId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, status])
+  @@index([workspaceId])
+  @@index([proposedById])
+}
+
+model OwnerRecoveryRequest {
+  id                 String              @id @default(cuid())
+  organizationId     String
+  requestedByEmail   String // Support agent email
+  requestedByName    String?
+  requestedReason    String
+  supportTicketId    String?
+  targetUserEmail    String // User to become owner
+  targetUserId       String?
+  verificationToken  String              @unique
+  verificationMethod String              @default("email")
+  verifiedAt         DateTime?
+  status             OwnerRecoveryStatus @default(PENDING)
+  expiresAt          DateTime // 72 hours
+  approvedAt         DateTime?
+  approvedBy         String?
+  deniedAt           DateTime?
+  deniedBy           String?
+  deniedReason       String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status])
+  @@index([verificationToken])
+}
+
+// ============================================================================
+// POLICY EXCEPTION REQUESTS
+// ============================================================================
+
+enum PolicyExceptionType {
+  PROPOSAL // New global policy proposal
+  REMOVAL_REQUEST // Request to remove a global policy
+  WORKSPACE_EXCEPTION // Request workspace-specific exception
+}
+
+enum PolicyExceptionStatus {
+  PENDING
+  APPROVED
+  DENIED
+  WITHDRAWN
+}
+
+// ============================================================================
+// WORKSPACE CHAT (AI Chatbot)
+// ============================================================================
+
+enum LLMProvider {
+  CLAUDE
+  OPENAI
+  GEMINI
+}
+
+enum ChatMessageRole {
+  USER
+  ASSISTANT
+  TOOL_USE
+  TOOL_RESULT
+  PERMISSION_REQUEST
+}
+
+model PolicyExceptionRequest {
+  id             String              @id @default(cuid())
+  organizationId String
+  workspaceId    String // Requesting workspace
+  policyId       String? // Target policy (null for new proposals)
+  requestType    PolicyExceptionType
+  requestedById  String
+
+  // For PROPOSAL: the proposed policy details
+  proposedMatchers     String[]
+  proposedToolPatterns String[]
+  proposedEffect       PolicyEffect?
+  proposedDescription  String?
+
+  // Request details
+  justification String // Why they need this
+
+  // Status
+  status     PolicyExceptionStatus @default(PENDING)
+  reviewedAt DateTime?
+  reviewedBy String?
+  reviewNote String?
+
+  // If approved, the resulting policy/exception
+  resultPolicyId String? // Created/modified policy
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace    Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  policy       Policy?      @relation("PolicyExceptionTarget", fields: [policyId], references: [id], onDelete: SetNull)
+  requestedBy  User         @relation("PolicyExceptionRequestedBy", fields: [requestedById], references: [id], onDelete: Cascade)
+  reviewer     User?        @relation("PolicyExceptionReviewedBy", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  resultPolicy Policy?      @relation("PolicyExceptionResult", fields: [resultPolicyId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, status])
+  @@index([workspaceId])
+  @@index([policyId])
+  @@index([requestedById])
+}
+
+// ============================================================================
+// WORKSPACE CHAT MODELS
+// ============================================================================
+
+model WorkspaceChatSettings {
+  id                  String       @id @default(cuid())
+  workspaceId         String       @unique
+  enabled             Boolean      @default(true)
+  defaultLlmProvider  LLMProvider?
+  defaultLlmModel     String?
+  systemPrompt        String?      @db.Text
+  monthlyMessageQuota Int?
+  monthlyTokenQuota   Int?
+  adminChatVisibility Boolean      @default(false)
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model UserLLMConfig {
+  id                   String      @id @default(cuid())
+  userId               String
+  workspaceId          String
+  provider             LLMProvider
+  apiKey               String // Encrypted
+  model                String?
+  alwaysAllowTools     String[]    @default([])
+  skipToolConfirmation Boolean     @default(false) // When true, skip confirmation for all tools
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, workspaceId])
+  @@index([userId])
+  @@index([workspaceId])
+}
+
+model WorkspaceChatConversation {
+  id          String   @id @default(cuid())
+  workspaceId String
+  userId      String
+  title       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  WorkspaceChatMessage[]
+
+  @@index([workspaceId, userId])
+  @@index([createdAt])
+}
+
+model WorkspaceChatMessage {
+  id                  String          @id @default(cuid())
+  conversationId      String
+  role                ChatMessageRole
+  content             String          @db.Text
+  toolName            String?
+  toolInput           Json?
+  toolResult          Json?
+  permissionRequestId String?
+  tokenCount          Int?
+  createdAt           DateTime        @default(now())
+
+  conversation      WorkspaceChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  permissionRequest PermissionRequest?        @relation(fields: [permissionRequestId], references: [id], onDelete: SetNull)
+
+  @@index([conversationId])
+  @@index([createdAt])
+}
+
+model WorkspaceChatUsage {
+  id           String   @id @default(cuid())
+  workspaceId  String
+  userId       String
+  month        DateTime // First of month
+  messageCount Int      @default(0)
+  inputTokens  Int      @default(0)
+  outputTokens Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId, month])
+  @@index([workspaceId])
+  @@index([userId])
+}
+
+// ============================================================================
+// USER ONBOARDING
+// ============================================================================
+
+model UserOnboarding {
+  id     String @id @default(cuid())
+  userId String @unique
+
+  currentTourId  String? // null = no active tour
+  currentStep    Int      @default(0)
+  completedTours String[] @default([])
+  completedSteps String[] @default([]) // "tourId:stepId" format
+
+  dismissed    Boolean @default(false)
+  showAdvanced Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ============================================================================
+// FEATURE DISCOVERY & NOTIFICATIONS
+// ============================================================================
+
+enum FeatureTipsSetting {
+  ON
+  OFF
+  INHERIT
+}
+
+enum DismissType {
+  NOT_INTERESTED // Permanent - never show again
+  REMIND_LATER // Show again after remindAfter date
+}
+
+model WorkspaceFeatureTipsSettings {
+  id          String             @id @default(cuid())
+  workspaceId String             @unique
+  setting     FeatureTipsSetting @default(INHERIT)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model UserFeatureTipsSettings {
+  id          String             @id @default(cuid())
+  userId      String
+  workspaceId String
+  setting     FeatureTipsSetting @default(INHERIT)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, workspaceId])
+  @@index([userId])
+  @@index([workspaceId])
+}
+
+model FeatureTipOrgOverride {
+  id             String   @id @default(cuid())
+  organizationId String
+  tipId          String
+  enabled        Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, tipId])
+  @@index([organizationId])
+}
+
+model FeatureTipDismissal {
+  id             String      @id @default(cuid())
+  userId         String
+  organizationId String
+  tipId          String
+  dismissType    DismissType
+  dismissedAt    DateTime    @default(now())
+  remindAfter    DateTime? // For REMIND_LATER, set to dismissedAt + 30 days
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId, tipId])
+  @@index([userId])
+  @@index([organizationId])
+}
+
+model EmailDigestPreference {
+  id             String   @id @default(cuid())
+  userId         String
+  organizationId String
+  enabled        Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@index([userId])
+  @@index([organizationId])
+}
+
+model EmailDigestLog {
+  id             String   @id @default(cuid())
+  organizationId String
+  recipientCount Int
+  sentAt         DateTime @default(now())
+  periodStart    DateTime
+  periodEnd      DateTime
+  status         String // SENT, FAILED, PARTIAL
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([sentAt])
+}
+
+model MilestoneAchievement {
+  id             String   @id @default(cuid())
+  organizationId String
+  milestoneId    String
+  achievedAt     DateTime @default(now())
+  notifiedVia    String[] // ['toast', 'email']
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, milestoneId])
+  @@index([organizationId])
+}
+
+model MilestoneNotificationPreference {
+  id             String   @id @default(cuid())
+  userId         String
+  organizationId String
+  toastEnabled   Boolean  @default(true)
+  emailEnabled   Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@index([userId])
+  @@index([organizationId])
+}

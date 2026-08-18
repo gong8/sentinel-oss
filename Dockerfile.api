@@ -1,0 +1,117 @@
+# Stage 1: Builder
+FROM node:20-alpine AS builder
+
+RUN corepack enable
+WORKDIR /app
+
+# Copy package files first (better caching)
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY packages/api/package.json packages/api/
+COPY packages/db/package.json packages/db/
+COPY packages/shared/package.json packages/shared/
+COPY packages/a2a/package.json packages/a2a/
+COPY packages/mcp/package.json packages/mcp/
+COPY packages/mcp-admin/package.json packages/mcp-admin/
+COPY patches ./patches
+
+RUN npm pkg delete scripts.prepare
+RUN pnpm install --frozen-lockfile
+
+# Copy source and build
+COPY packages/api packages/api
+COPY packages/db packages/db
+COPY packages/shared packages/shared
+COPY packages/a2a packages/a2a
+COPY packages/mcp packages/mcp
+COPY packages/mcp-admin packages/mcp-admin
+COPY scripts scripts
+
+# Build
+WORKDIR /app/packages/db
+RUN pnpm prisma generate
+RUN pnpm build
+
+WORKDIR /app
+RUN pnpm --filter @sentinel/shared build
+RUN pnpm --filter @sentinel/a2a build
+RUN pnpm --filter @sentinel/mcp build
+RUN pnpm --filter @sentinel/mcp-admin build
+RUN pnpm --filter @sentinel/api build
+
+# Remove dev-only dependencies to reduce image size
+RUN rm -rf node_modules/.pnpm/typescript@* \
+    node_modules/.pnpm/turbo* \
+    node_modules/.pnpm/prettier@* \
+    node_modules/.pnpm/eslint* \
+    node_modules/.pnpm/@typescript-eslint* \
+    node_modules/.pnpm/@eslint* \
+    node_modules/.pnpm/vitest* \
+    node_modules/.pnpm/@vitest* \
+    node_modules/.pnpm/playwright* \
+    node_modules/.pnpm/@playwright* \
+    node_modules/.pnpm/lightningcss* \
+    node_modules/.pnpm/@esbuild* \
+    node_modules/.pnpm/esbuild@* \
+    node_modules/.pnpm/@commitlint* \
+    node_modules/.pnpm/husky* \
+    node_modules/.pnpm/lint-staged* \
+    node_modules/.pnpm/nodemon* \
+    node_modules/.pnpm/vite@* \
+    node_modules/.pnpm/rollup@* \
+    node_modules/.pnpm/react-dom@* \
+    node_modules/.pnpm/caniuse-lite@* \
+    2>/dev/null || true
+
+# Stage 2: Runner
+FROM node:20-alpine AS runner
+
+RUN apk add --no-cache curl
+RUN npm install -g tsx
+
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 sentinel
+
+WORKDIR /app
+
+# Copy everything needed for runtime (with correct ownership to avoid chown layer duplication)
+COPY --from=builder --chown=sentinel:nodejs /app/package.json ./
+COPY --from=builder --chown=sentinel:nodejs /app/pnpm-workspace.yaml ./
+COPY --from=builder --chown=sentinel:nodejs /app/node_modules ./node_modules
+
+# Copy built packages
+COPY --from=builder --chown=sentinel:nodejs /app/packages/api/dist ./packages/api/dist
+COPY --from=builder --chown=sentinel:nodejs /app/packages/api/package.json ./packages/api/
+COPY --from=builder --chown=sentinel:nodejs /app/packages/api/node_modules ./packages/api/node_modules
+
+COPY --from=builder --chown=sentinel:nodejs /app/packages/db/dist ./packages/db/dist
+COPY --from=builder --chown=sentinel:nodejs /app/packages/db/package.json ./packages/db/
+COPY --from=builder --chown=sentinel:nodejs /app/packages/db/prisma ./packages/db/prisma
+COPY --from=builder --chown=sentinel:nodejs /app/packages/db/prisma.config.ts ./packages/db/
+COPY --from=builder --chown=sentinel:nodejs /app/packages/db/src/generated ./packages/db/src/generated
+
+COPY --from=builder --chown=sentinel:nodejs /app/packages/shared/dist ./packages/shared/dist
+COPY --from=builder --chown=sentinel:nodejs /app/packages/shared/package.json ./packages/shared/
+
+COPY --from=builder --chown=sentinel:nodejs /app/packages/a2a/dist ./packages/a2a/dist
+COPY --from=builder --chown=sentinel:nodejs /app/packages/a2a/package.json ./packages/a2a/
+COPY --from=builder --chown=sentinel:nodejs /app/packages/a2a/node_modules ./packages/a2a/node_modules
+
+COPY --from=builder --chown=sentinel:nodejs /app/packages/mcp/dist ./packages/mcp/dist
+COPY --from=builder --chown=sentinel:nodejs /app/packages/mcp/package.json ./packages/mcp/
+COPY --from=builder --chown=sentinel:nodejs /app/packages/mcp/node_modules ./packages/mcp/node_modules
+
+COPY --from=builder --chown=sentinel:nodejs /app/packages/mcp-admin/dist ./packages/mcp-admin/dist
+COPY --from=builder --chown=sentinel:nodejs /app/packages/mcp-admin/package.json ./packages/mcp-admin/
+COPY --from=builder --chown=sentinel:nodejs /app/packages/mcp-admin/node_modules ./packages/mcp-admin/node_modules
+
+COPY --from=builder --chown=sentinel:nodejs /app/scripts/docker-entrypoint.sh ./scripts/
+RUN chmod +x ./scripts/docker-entrypoint.sh
+
+USER sentinel
+
+EXPOSE 3000 3001 3002 3003
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD curl -f http://localhost:3000/health || exit 1
+
+CMD ["./scripts/docker-entrypoint.sh"]

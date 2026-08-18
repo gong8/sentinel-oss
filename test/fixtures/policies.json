@@ -1,0 +1,26 @@
+[
+  {
+    "slug": "admin-all-access",
+    "matcher": "role:ADMIN",
+    "toolPattern": "*::*",
+    "effect": "ALLOW",
+    "description": "Admins can access all tools",
+    "enabled": true
+  },
+  {
+    "slug": "allow-users-github-read",
+    "matcher": "role:USER",
+    "toolPattern": "github.com::getFile",
+    "effect": "ALLOW",
+    "description": "Users can read GitHub files",
+    "enabled": true
+  },
+  {
+    "slug": "deny-users-github-merge",
+    "matcher": "role:USER",
+    "toolPattern": "github.com::mergePR",
+    "effect": "DENY",
+    "description": "Users cannot merge pull requests",
+    "enabled": true
+  }
+]

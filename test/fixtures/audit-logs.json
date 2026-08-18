@@ -1,0 +1,22 @@
+[
+  {
+    "toolName": "github.com::createPR",
+    "parameters": {
+      "repo": "company/backend",
+      "title": "Fix authentication bug"
+    },
+    "decision": "ALLOWED",
+    "justification": null,
+    "policyIds": ["policy-id-1"]
+  },
+  {
+    "toolName": "github.com::mergePR",
+    "parameters": {
+      "repo": "company/backend",
+      "prNumber": 123
+    },
+    "decision": "DENIED",
+    "justification": "Denied by policy: Users cannot merge pull requests",
+    "policyIds": ["policy-id-2"]
+  }
+]

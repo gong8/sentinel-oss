@@ -1,0 +1,321 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
+@import 'tailwindcss';
+
+/* Local Nohemi font declarations for display/branding */
+@font-face {
+  font-family: Nohemi;
+  src: url('/fonts/Nohemi-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: Nohemi;
+  src: url('/fonts/Nohemi-Medium.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: Nohemi;
+  src: url('/fonts/Nohemi-SemiBold.ttf') format('truetype');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: Nohemi;
+  src: url('/fonts/Nohemi-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@config '../tailwind.config.js';
+
+@layer base {
+  :root {
+    --background: 260 20% 97%;
+    --foreground: 260 22% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 260 22% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 260 22% 10%;
+    --primary: 262 40% 32%;
+    --primary-foreground: 260 30% 96%;
+    --secondary: 260 16% 92%;
+    --secondary-foreground: 260 22% 14%;
+    --muted: 260 16% 92%;
+    --muted-foreground: 260 10% 40%;
+    --accent: 262 14% 88%;
+    --accent-foreground: 260 22% 14%;
+    --destructive: 0 60% 45%;
+    --destructive-foreground: 260 30% 96%;
+    --border: 262 12% 84%;
+    --input: 262 12% 88%;
+    --ring: 262 60% 50%;
+    --radius: 0.6rem;
+
+    /* Semantic colors for visual hierarchy */
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+    --info: 214 100% 50%;
+    --info-foreground: 0 0% 100%;
+
+    /* Gradient accent colors - deep violet #4E00FF */
+    --gradient-start: 262 100% 50%;
+    --gradient-mid: 270 90% 55%;
+    --gradient-end: 280 80% 60%;
+  }
+
+  .dark {
+    --background: 240 10% 3.5%;
+    --foreground: 0 0% 95%;
+    --card: 240 6% 6%;
+    --card-foreground: 0 0% 95%;
+    --popover: 240 6% 6%;
+    --popover-foreground: 0 0% 95%;
+    --primary: 262 100% 60%;
+    --primary-foreground: 240 10% 4%;
+    --secondary: 240 4% 12%;
+    --secondary-foreground: 0 0% 95%;
+    --muted: 240 4% 12%;
+    --muted-foreground: 240 5% 55%;
+    --accent: 240 4% 16%;
+    --accent-foreground: 0 0% 95%;
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 95%;
+    --border: 240 4% 14%;
+    --input: 240 4% 14%;
+    --ring: 262 100% 50%;
+
+    /* Semantic colors for visual hierarchy */
+    --warning: 38 80% 45%;
+    --warning-foreground: 0 0% 100%;
+    --success: 142 60% 40%;
+    --success-foreground: 0 0% 100%;
+    --info: 214 80% 55%;
+    --info-foreground: 0 0% 100%;
+
+    /* Dark mode gradient - deep violet #4E00FF */
+    --gradient-start: 262 100% 50%;
+    --gradient-mid: 268 90% 55%;
+    --gradient-end: 275 80% 60%;
+  }
+
+  * {
+    @apply border-border;
+
+    /* Custom scrollbar styling for light/dark mode */
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 30%) transparent;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+
+    font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+    background-image:
+      radial-gradient(1200px 520px at 85% -10%, hsl(262deg 20% 92% / 60%), transparent 60%),
+      radial-gradient(900px 420px at 10% 0%, hsl(270deg 18% 94% / 60%), transparent 55%),
+      repeating-linear-gradient(
+        90deg,
+        hsl(262deg 10% 88% / 35%) 0,
+        hsl(262deg 10% 88% / 35%) 1px,
+        transparent 1px,
+        transparent 32px
+      ),
+      repeating-linear-gradient(
+        0deg,
+        hsl(262deg 10% 88% / 35%) 0,
+        hsl(262deg 10% 88% / 35%) 1px,
+        transparent 1px,
+        transparent 32px
+      );
+    background-attachment: fixed;
+  }
+
+  .dark body {
+    background-color: hsl(240deg 10% 3.5%);
+    background-image:
+      /* Ambient gradient orbs - #4E00FF to #6B00FF */
+      radial-gradient(ellipse 80% 50% at 20% -20%, rgb(78 0 255 / 12%), transparent 50%),
+      radial-gradient(ellipse 60% 40% at 85% 10%, rgb(90 0 255 / 8%), transparent 45%),
+      radial-gradient(ellipse 50% 35% at 70% 90%, rgb(107 0 255 / 6%), transparent 45%),
+      radial-gradient(ellipse 45% 35% at 5% 80%, rgb(78 0 255 / 5%), transparent 40%),
+      repeating-linear-gradient(
+        90deg,
+        hsl(240deg 4% 12% / 30%) 0,
+        hsl(240deg 4% 12% / 30%) 1px,
+        transparent 1px,
+        transparent 32px
+      ),
+      repeating-linear-gradient(
+        0deg,
+        hsl(240deg 4% 12% / 30%) 0,
+        hsl(240deg 4% 12% / 30%) 1px,
+        transparent 1px,
+        transparent 32px
+      );
+    background-attachment: fixed;
+  }
+
+  code {
+    font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, monospace;
+  }
+
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--muted-foreground) / 30%);
+    border-radius: 4px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--muted-foreground) / 50%);
+  }
+
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+}
+
+@layer utilities {
+  .animate-page-in {
+    animation: page-in 420ms ease-out both;
+  }
+
+  /* Display font for branding */
+  .font-display {
+    font-family: Nohemi, ui-sans-serif, system-ui, sans-serif;
+  }
+
+  /* Gradient text utility - #4E00FF to #7B00FF */
+  .text-gradient {
+    background: linear-gradient(135deg, #4e00ff, #6b00ff);
+    background-clip: text;
+    color: transparent;
+  }
+
+  .text-gradient-subtle {
+    background: linear-gradient(135deg, #f8f8f8, #a080ff, #e8e8e8);
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Glow effects - #4E00FF */
+  .glow {
+    box-shadow:
+      0 0 20px rgb(78 0 255 / 25%),
+      0 0 40px rgb(107 0 255 / 15%);
+  }
+
+  .glow-subtle {
+    box-shadow: 0 0 30px rgb(78 0 255 / 15%);
+  }
+
+  /* Glass morphism */
+  .glass {
+    background: hsl(var(--card) / 40%);
+    backdrop-filter: blur(12px);
+    border: 1px solid hsl(var(--border) / 40%);
+  }
+
+  .glass-strong {
+    background: hsl(var(--card) / 60%);
+    backdrop-filter: blur(20px);
+    border: 1px solid hsl(var(--border) / 50%);
+  }
+
+  /* Gradient border */
+  .border-gradient {
+    position: relative;
+    border: none;
+    background: hsl(var(--card));
+  }
+
+  .border-gradient::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    padding: 1px;
+    border-radius: inherit;
+    background: linear-gradient(
+      135deg,
+      rgb(78 0 255 / 40%),
+      rgb(90 0 255 / 20%),
+      rgb(107 0 255 / 40%)
+    );
+    mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  /* Shimmer effect for buttons */
+  .shimmer {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .shimmer::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, hsl(0deg 0% 100% / 10%), transparent);
+    transition: left 0.5s ease;
+  }
+
+  .shimmer:hover::after {
+    left: 100%;
+  }
+
+  /* Pulse glow animation */
+  .animate-pulse-glow {
+    animation: pulse-glow 3s ease-in-out infinite;
+  }
+}
+
+/* Violet pulse glow animation */
+@keyframes pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 20px rgb(78 0 255 / 20%);
+  }
+
+  50% {
+    box-shadow:
+      0 0 40px rgb(78 0 255 / 35%),
+      0 0 60px rgb(107 0 255 / 20%);
+  }
+}
+
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

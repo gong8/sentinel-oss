@@ -1,0 +1,35 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "lib": ["ES2022"],
+    "moduleResolution": "bundler",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "noEmit": true,
+    "noUnusedLocals": false,
+    "allowImportingTsExtensions": true,
+    "types": ["vitest/globals", "node"],
+    "paths": {
+      "@sentinel/api": ["./packages/api/src"],
+      "@sentinel/api/*": ["./packages/api/src/*"],
+      "@sentinel/db": ["./packages/db/src"],
+      "@sentinel/db/*": ["./packages/db/src/*"],
+      "@sentinel/docs": ["./packages/docs/src"],
+      "@sentinel/docs/*": ["./packages/docs/src/*"],
+      "@sentinel/mcp": ["./packages/mcp/src"],
+      "@sentinel/mcp/*": ["./packages/mcp/src/*"],
+      "@sentinel/mcp-admin": ["./packages/mcp-admin/src"],
+      "@sentinel/mcp-admin/*": ["./packages/mcp-admin/src/*"],
+      "@sentinel/shared": ["./packages/shared/src"],
+      "@sentinel/shared/*": ["./packages/shared/src/*"],
+      "@sentinel/web": ["./packages/web/src"],
+      "@sentinel/web/*": ["./packages/web/src/*"]
+    }
+  },
+  "include": ["test/**/*"],
+  "exclude": ["node_modules", "dist", ".next", "coverage", "test/seed-generation"]
+}

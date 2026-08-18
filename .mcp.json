@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "test-runner": {
+      "command": "node",
+      "args": ["packages/mcp-test-runner/dist/index.js"],
+      "env": {
+        "CLAUDE_PROJECT_DIR": "."
+      }
+    }
+  }
+}

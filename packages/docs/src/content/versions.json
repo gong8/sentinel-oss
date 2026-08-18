@@ -1,0 +1,17 @@
+{
+  "versions": [
+    {
+      "id": "v2",
+      "label": "2.0",
+      "isLatest": true,
+      "releaseDate": "2026-01-01"
+    },
+    {
+      "id": "v1",
+      "label": "1.0",
+      "isLatest": false,
+      "releaseDate": "2025-06-01"
+    }
+  ],
+  "defaultVersion": "v2"
+}

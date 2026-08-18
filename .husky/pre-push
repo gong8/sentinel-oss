@@ -1,0 +1,3 @@
+# Quick typecheck before push - full test suite runs in CI
+# Note: lint-staged already ran on pre-commit, no need to repeat
+turbo run typecheck

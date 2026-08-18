@@ -1,0 +1,40 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "globalPassThroughEnv": ["DATABASE_URL", "ENCRYPTION_KEY", "PRISMA_LOG"],
+  "ui": "stream",
+  "tasks": {
+    "db:generate": {
+      "cache": true,
+      "inputs": ["prisma/schema.prisma", "prisma/prisma.config.ts"],
+      "outputs": ["src/generated/**", "dist/**"]
+    },
+    "build": {
+      "dependsOn": ["^build", "db:generate"],
+      "outputs": ["dist/**", ".next/**"],
+      "cache": true
+    },
+    "lint": {
+      "cache": true,
+      "outputs": []
+    },
+    "typecheck": {
+      "dependsOn": ["db:generate"],
+      "cache": true,
+      "outputs": []
+    },
+    "test:unit": {
+      "dependsOn": ["db:generate"],
+      "cache": false,
+      "outputs": ["test/results/**"]
+    },
+    "test:integration": {
+      "dependsOn": ["db:generate"],
+      "cache": false,
+      "outputs": ["test/results/**"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    }
+  }
+}

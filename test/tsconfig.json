@@ -1,0 +1,37 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "types": ["vitest/globals", "node"],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "noEmit": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "jsx": "react-jsx",
+    "baseUrl": "..",
+    "forceConsistentCasingInFileNames": false,
+    "paths": {
+      "@sentinel/api": ["./packages/api/src"],
+      "@sentinel/api/*": ["./packages/api/src/*"],
+      "@sentinel/db": ["./packages/db/src"],
+      "@sentinel/db/*": ["./packages/db/src/*"],
+      "@sentinel/web": ["./packages/web/src"],
+      "@sentinel/web/*": ["./packages/web/src/*"],
+      "@sentinel/shared": ["./packages/shared/src"],
+      "@sentinel/shared/*": ["./packages/shared/src/*"],
+      "@sentinel/mcp": ["./packages/mcp/src"],
+      "@sentinel/mcp/*": ["./packages/mcp/src/*"],
+      "@sentinel/mcp-admin": ["./packages/mcp-admin/src"],
+      "@sentinel/mcp-admin/*": ["./packages/mcp-admin/src/*"]
+    }
+  },
+  "include": [
+    "./**/*",
+    "../packages/api/src/**/*",
+    "../packages/db/src/**/*",
+    "../packages/web/src/**/*",
+    "../packages/mcp/src/**/*",
+    "../packages/mcp-admin/src/**/*",
+    "../packages/shared/src/**/*"
+  ],
+  "exclude": ["../node_modules", "../dist", "../.next", "../packages/db/dist"]
+}

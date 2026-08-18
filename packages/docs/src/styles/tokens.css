@@ -1,0 +1,212 @@
+/* Design tokens extracted from SENTINEL landing page */
+/* Source: sentinel-web/src/index.css */
+
+/* Local Nohemi font declarations */
+@font-face {
+  font-family: 'Nohemi';
+  src: url('/fonts/Nohemi-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Nohemi';
+  src: url('/fonts/Nohemi-Medium.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Nohemi';
+  src: url('/fonts/Nohemi-SemiBold.ttf') format('truetype');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Nohemi';
+  src: url('/fonts/Nohemi-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@layer base {
+  :root {
+    --background: 215 24% 97%;
+    --foreground: 222 22% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 22% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 22% 10%;
+    --primary: 214 28% 28%;
+    --primary-foreground: 210 30% 96%;
+    --secondary: 215 20% 92%;
+    --secondary-foreground: 222 22% 14%;
+    --muted: 215 20% 92%;
+    --muted-foreground: 215 12% 40%;
+    --accent: 210 18% 88%;
+    --accent-foreground: 222 22% 14%;
+    --destructive: 0 60% 45%;
+    --destructive-foreground: 210 30% 96%;
+    --border: 214 16% 84%;
+    --input: 214 16% 88%;
+    --ring: 214 35% 45%;
+    --radius: 0.75rem;
+
+    /* Gradient accent colors - deep violet #4E00FF */
+    --gradient-start: 262 100% 50%;
+    --gradient-mid: 270 90% 55%;
+    --gradient-end: 280 80% 60%;
+
+    /* Docs-specific tokens */
+    --sidebar-width: 280px;
+    --toc-width: 220px;
+    --header-height: 64px;
+    --content-max-width: 850px;
+  }
+
+  .dark {
+    --background: 240 10% 3.5%;
+    --foreground: 0 0% 95%;
+    --card: 240 6% 6%;
+    --card-foreground: 0 0% 95%;
+    --popover: 240 6% 6%;
+    --popover-foreground: 0 0% 95%;
+    --primary: 262 100% 75%;
+    --primary-foreground: 240 10% 4%;
+    --secondary: 240 4% 12%;
+    --secondary-foreground: 0 0% 95%;
+    --muted: 240 4% 12%;
+    --muted-foreground: 240 5% 55%;
+    --accent: 240 4% 16%;
+    --accent-foreground: 0 0% 95%;
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 95%;
+    --border: 240 4% 14%;
+    --input: 240 4% 14%;
+    --ring: 262 100% 50%;
+
+    /* Dark mode gradient - deep violet #4E00FF */
+    --gradient-start: 262 100% 50%;
+    --gradient-mid: 268 90% 55%;
+    --gradient-end: 275 80% 60%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-padding-top: calc(var(--header-height) + 24px);
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    background-color: hsl(var(--background));
+    background-attachment: fixed;
+  }
+
+  .dark body {
+    background-color: hsl(240 10% 3.5%);
+    background-image:
+      radial-gradient(ellipse 80% 50% at 20% -20%, rgba(78, 0, 255, 0.08), transparent 50%),
+      radial-gradient(ellipse 60% 40% at 85% 10%, rgba(90, 0, 255, 0.05), transparent 45%);
+  }
+
+  :not(.dark) body {
+    background-color: hsl(215 24% 97%);
+    background-image:
+      radial-gradient(ellipse 80% 50% at 20% -20%, rgba(78, 0, 255, 0.04), transparent 50%),
+      radial-gradient(ellipse 60% 40% at 85% 10%, rgba(90, 0, 255, 0.02), transparent 45%);
+  }
+
+  /* Display font for headings */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  .font-display {
+    font-family: 'Nohemi', ui-sans-serif, system-ui, sans-serif;
+  }
+
+  code,
+  pre,
+  .font-mono {
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  }
+}
+
+@layer utilities {
+  /* Gradient text utility - #4E00FF to #7B00FF */
+  .text-gradient {
+    background: linear-gradient(135deg, #4e00ff, #6b00ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Glow effects - #4E00FF */
+  .glow {
+    box-shadow:
+      0 0 20px rgba(78, 0, 255, 0.25),
+      0 0 40px rgba(107, 0, 255, 0.15);
+  }
+
+  .glow-subtle {
+    box-shadow: 0 0 30px rgba(78, 0, 255, 0.15);
+  }
+
+  /* Glass morphism */
+  .glass {
+    background: hsl(var(--card) / 0.4);
+    backdrop-filter: blur(12px);
+    border: 1px solid hsl(var(--border) / 0.4);
+  }
+
+  .glass-strong {
+    background: hsl(var(--card) / 0.6);
+    backdrop-filter: blur(20px);
+    border: 1px solid hsl(var(--border) / 0.5);
+  }
+
+  /* Grid background pattern */
+  .bg-grid {
+    background-image:
+      linear-gradient(hsl(var(--border) / 0.3) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--border) / 0.3) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+
+  .bg-grid-small {
+    background-image:
+      linear-gradient(hsl(var(--border) / 0.2) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--border) / 0.2) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
+}

@@ -1,0 +1,37 @@
+{
+  "recommendations": [
+    // Language support
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "prisma.prisma",
+
+    // TypeScript
+    "yoavbls.pretty-ts-errors",
+
+    // Tailwind CSS
+    "bradlc.vscode-tailwindcss",
+
+    // Testing
+    "vitest.explorer",
+
+    // Git
+    "eamodio.gitlens",
+
+    // Utilities
+    "christian-kohler.path-intellisense",
+    "usernamehw.errorlens",
+    "gruntfuggly.todo-tree",
+
+    // Markdown
+    "yzhang.markdown-all-in-one",
+
+    // Database
+    "mtxr.sqltools",
+    "mtxr.sqltools-driver-pg"
+  ],
+  "unwantedRecommendations": [
+    // These can conflict with Prettier/ESLint
+    "hookyqr.beautify",
+    "dbaeumer.jshint"
+  ]
+}

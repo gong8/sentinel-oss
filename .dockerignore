@@ -1,0 +1,74 @@
+# Dependencies
+node_modules
+
+# Git
+.git
+.github
+.husky
+.gitignore
+
+# Tests
+test
+test-results
+playwright-report
+coverage
+**/*.test.ts
+**/*.spec.ts
+__tests__
+vitest.config.ts
+test_output.log
+
+# Build/Cache
+.turbo
+*.log
+tsconfig.tsbuildinfo
+
+# Environment
+.env
+.env.*
+!.env.example
+!.env.docker.example
+
+# IDE/Editor
+.vscode
+.idea
+*.swp
+*.swo
+.editorconfig
+
+# AI/Tool configs
+.claude
+.planning
+.serena
+.gemini-clipboard
+.mcp.json
+ztemp
+AUDIT-*
+worktrees
+
+# Documentation (not needed in container)
+docs
+*.md
+!packages/**/*.md
+
+# Linting/Formatting configs
+eslint.config.mjs
+.prettierrc.json
+.prettierignore
+commitlint.config.cjs
+lint-staged.config.cjs
+turbo.json
+
+# Deployment configs (other platforms)
+fly.toml
+railway.toml
+Caddyfile
+docker-compose*.yml
+Dockerfile*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Source maps (not needed in production)
+**/*.map

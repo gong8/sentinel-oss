@@ -1,0 +1,126 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+.npm/
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Testing
+coverage/
+coverage-results.json
+.nyc_output/
+test-results/
+test/results/
+playwright-report/
+playwright/.cache/
+.db-snapshot.json
+
+# IDE & Editors
+# Note: .vscode/ is NOT ignored - we want to version control workspace settings
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+.factorypath
+
+# OS Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# Prisma
+prisma/migrations/dev.db
+prisma/migrations/dev.db-journal
+*.db
+*.db-journal
+
+# Misc
+.turbo/
+.vercel/
+.cache/
+.temp/
+.tmp/
+
+# Debug
+*.cpuprofile
+*.heapsnapshot
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Optional stylelint cache
+.stylelintcache
+
+# Optional REPL history
+.node_repl_history
+
+# Lock files (keep pnpm-lock.yaml, ignore others)
+package-lock.json
+yarn.lock
+
+# Backup files
+*.bak
+*.backup
+*.old
+.claude/.test-attempts
+.claude/.test-passed
+
+# Prisma generated files
+packages/db/src/generated/
+
+# Claude Code local settings (user-specific)
+.claude/settings.local.json
+.claude/plans/
+
+# Claude-mem context files (keep root CLAUDE.md only)
+**/CLAUDE.md
+!/CLAUDE.md
+
+# Seed data (contains generated secrets for testing)
+
+# Audit results (may contain sensitive information)
+AUDIT-*/
+CHECK-CORRECTNESS-RESULT/
+
+sentinel-*.tar.gz
+
+# Test output files
+test_output.log
+test_output*.log
+
+# Serena (AI coding assistant)
+.serena/cache/
+.serena/memories/
+
+# Playwright reports in subdirectories
+**/playwright-report/

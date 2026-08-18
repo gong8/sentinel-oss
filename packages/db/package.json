@@ -1,0 +1,48 @@
+{
+  "name": "@sentinel/db",
+  "version": "0.1.0",
+  "license": "AGPL-3.0-only",
+  "private": true,
+  "type": "module",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "import": "./dist/src/index.js"
+    }
+  },
+  "scripts": {
+    "build": "dotenv -e ../../.env -- tsc",
+    "db:generate": "dotenv -e ../../.env -- prisma generate && pnpm build",
+    "db:migrate": "dotenv -e ../../.env -- prisma migrate dev && pnpm db:generate",
+    "db:migrate:deploy": "dotenv -e ../../.env -- prisma migrate deploy && pnpm db:generate",
+    "db:push": "dotenv -e ../../.env -- prisma db push && pnpm db:generate",
+    "db:push:test": "dotenv -e ../../.env -- tsx prisma/push-test-db.ts",
+    "db:reset": "dotenv -e ../../.env -- prisma migrate reset --force && pnpm db:generate",
+    "db:reset:seed": "dotenv -e ../../.env -- prisma db push --force-reset --accept-data-loss && pnpm build && dotenv -e ../../.env -- tsx prisma/seed.ts",
+    "db:reset:force": "dotenv -e ../../.env -- prisma migrate reset --force && pnpm db:generate",
+    "db:init": "dotenv -e ../../.env -- prisma db push --force-reset --accept-data-loss && pnpm build && dotenv -e ../../.env -- tsx prisma/seed-minimal.ts",
+    "db:clear": "dotenv -e ../../.env -- tsx prisma/clear.ts",
+    "db:clear:seed": "dotenv -e ../../.env -- tsx prisma/clear.ts && dotenv -e ../../.env -- prisma migrate deploy && pnpm db:generate && dotenv -e ../../.env -- tsx prisma/seed.ts",
+    "db:studio": "dotenv -e ../../.env -- prisma studio",
+    "db:seed": "dotenv -e ../../.env -- tsx prisma/seed-minimal.ts",
+    "db:creds": "dotenv -e ../../.env -- tsx prisma/creds.ts",
+    "db:seed:creds": "pnpm db:seed && pnpm db:creds",
+    "db:reset:seed:creds": "pnpm db:reset:seed && pnpm db:creds",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@prisma/client": "^7.2.0",
+    "@prisma/adapter-pg": "^7.2.0"
+  },
+  "devDependencies": {
+    "dotenv": "^17.2.3",
+    "prisma": "^7.2.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  }
+}
